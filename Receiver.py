@@ -46,7 +46,7 @@ def main(args):
         log_fh = open(LOG_FILE, 'a')
         print('%s Started BlueTooth LE Traffic Light Loop Detection' % datetime.now(), file=log_fh)
 
-    led = rgb.RGB_led(21,20,16)
+    led = rgb.RGB_led(17,27,22)
 
     # Handle sigterm so we can exit gracefully
     signal.signal(signal.SIGTERM, sig_handler)
