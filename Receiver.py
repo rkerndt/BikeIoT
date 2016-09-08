@@ -114,7 +114,7 @@ def main(args):
                 else:
                     led.red()
             else:
-                led.green(True)
+                led.blue(True)
             if DEBUG:
                 print()
     except btle.BTLEException:
