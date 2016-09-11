@@ -6,7 +6,7 @@
     compress
     rotate 5
     weekly
-    maxsize 1MB
+    maxsize 1M
     missingok
     notifempty
 }
