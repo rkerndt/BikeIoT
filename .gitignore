@@ -3,3 +3,5 @@ misc/
 
 #Firmware files for particle
 *.bin
+.idea
+*.swp
