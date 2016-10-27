@@ -13,6 +13,17 @@ int connect_rejected = 0;
 String local_ip_str("0.0.0.0");
 String public_ip_str("0.0.0.0");
 
+// Valid connecting ip address
+String ip_list[] = { String("70.240.52.134"),
+                     nullptr };
+
+// SSH relay 
+TCPServer server = TCPServer(22);
+TCPClient client;
+uint8_t in_buf[1500];
+uint8_t ou_buf[1500];
+
+
 void setup() {
   Serial.begin(115200);
   Particle.variable(NAME_STATUS, status);
@@ -28,6 +39,8 @@ void setup() {
     Particle.process();
   }
   Particle.subscribe("spark/", handler);
+  server.begin();
+  Serial.println("Listing on port 22");
 }
 
 void loop() {
@@ -49,7 +62,35 @@ void loop() {
     public_ip_str = String("0.0.0.0");
   }
 
-
+  // echo back packets for anyone connected
+  if ( client.connected() )
+  {
+    int num_read = client.read(in_buf, sizeof(in_buf));
+    if ( num_read > 0 )
+    {
+      server.write(in_buf, num_read);
+      Serial.write(in_buf, num_read);
+    }
+  }
+  else
+  {
+    client = server.available();
+    if ( client.connected() )
+    {
+      String remote_ip_str = ip_to_string(client.remoteIP());
+      if ( !check_ip(remote_ip_str) )
+      {
+        client.stop();
+        Serial.print("Denied connection from ");
+      }
+      else
+      {
+        Serial.print("Accepted connection from ");
+      }
+      Serial.println(client.remoteIP());
+      client.println("Welcome");
+    }
+  }
 }
 
 void publish_updates() {
@@ -64,11 +105,73 @@ String ip_to_string(IPAddress ipaddr) {
   return s;
 }
 
+bool string_to_ip(String ipaddr, IPAddress *ip) {
+  // TODO check for valid digits
+  String ip_str[4];
+  bool still_good = True;
+  split_string(ipaddr, '.', ip_str, 4);
+  for (int i = 0; (i < 4) && (ip != nullptr); ++i)
+  {
+    if (ip == nullptr)
+    {
+      still_good = false;
+      break;
+    }
+    ip[i] = ip_str->toInt();
+  }
+
+}
+
 int get_public_ip(String s)
 {
   Serial.println("Requesting public ip");
   bool result = Particle.publish(NAME_PUBLIC_IP_TOPIC);
   return (result == true) ? 1 : 0;
+}
+
+bool check_ip(String ip) {
+  String *ip_list_ptr = ip_list;
+  bool result = false;
+  while ( (ip_list_ptr != nullptr) && !result)
+  {
+    result = ip.startsWith(*ip_list_ptr);
+    ++ip_list_ptr;
+  }
+  return result;
+}
+
+int send_alive(String arg_list) {
+  String argv[3];
+  int still_good = true;
+
+}
+
+void send_udp_packet(IPAddress ipaddr, int port, String payload) {
+  UDP udp;
+  udp.beginPacket(ipaddr, port);
+  udp.write(payload);
+  udp.endPacket();
+}
+
+String* split_string(String str, char c, String* str_array, int len) {
+  
+  int idx = 0;
+  int i = 0;
+  for (i = 0; (i < len) && (idx < str.length()); ++i)
+  {
+    int jdx = arg_list.indexOf(c, idx);
+    if (jdx != -1)
+    {
+      str_array[i] = arg_list.substring(idx,jdx).trim();
+      idx = jdx + 1;
+    }
+    else
+    {
+      break;
+    }
+  }
+  str_array[i] = nullptr;
+  return str_array;
 }
 
 void handler(const char* topic, const char* data) {

@@ -22,5 +22,10 @@
 // Function declarations
 void publish_updates(void);
 String ip_to_string(IPAddress);
+IPAddress string_to_ip(String);
 void handler(const char*, const char*);
 int get_public_ip(String);
+bool check_ip(String);
+void send_udp_packet(IPAddress, int, String);
+int send_alive(String);
+String* split_string(String, char, String*, int);
