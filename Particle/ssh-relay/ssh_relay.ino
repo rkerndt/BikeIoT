@@ -33,7 +33,7 @@ void setup() {
   Particle.variable(NAME_LOCAL_IP_ADDR, local_ip_str);
   Particle.variable(NAME_PUBLIC_IP_ADDR, public_ip_str);
   Particle.function(NAME_GET_PUBLIC_IP, get_public_ip);
-
+  Particle.function(NAME_SEND_UDP, send_udp);
   while ( !Cellular.ready() )
   {
     Particle.process();
@@ -105,21 +105,26 @@ String ip_to_string(IPAddress ipaddr) {
   return s;
 }
 
-bool string_to_ip(String ipaddr, IPAddress *ip) {
+IPAddress string_to_ip(String ipaddr) {
   // TODO check for valid digits
-  String ip_str[4];
-  bool still_good = True;
+  String ip_str[5];
+  int ip[4];
+  bool still_good = true;
   split_string(ipaddr, '.', ip_str, 4);
-  for (int i = 0; (i < 4) && (ip != nullptr); ++i)
+  String *ip_str_ptr = ip_str;
+  Serial.print("Converting: ");
+  Serial.println(ipaddr);
+  for (int i = 0; (i < 4); ++i)
   {
-    if (ip == nullptr)
+    if (ip_str_ptr == nullptr)
     {
       still_good = false;
       break;
     }
-    ip[i] = ip_str->toInt();
+    ip[i] = ip_str_ptr->toInt();
+    ++ip_str_ptr;
   }
-
+  return IPAddress(ip[0],ip[1],ip[2],ip[3]);
 }
 
 int get_public_ip(String s)
@@ -140,35 +145,64 @@ bool check_ip(String ip) {
   return result;
 }
 
-int send_alive(String arg_list) {
-  String argv[3];
+int send_udp(String arg_list) {
+  // expects the arg_list to contain a dot-decimal ipv4 address,
+  // port number, and message. All comma seperated.
+  String argv[4];
+  IPAddress ipaddr;
+  int port;
   int still_good = true;
+  split_string(arg_list, ',', argv, 3);
+  if ( argv[0] != nullptr )
+  {
+    ipaddr = string_to_ip(argv[0]);
+  }
+  else
+  {
+    still_good = false;
+  }
+  if ( still_good && (argv[1] != nullptr) )
+  {
+    port = argv[1].toInt();
+  }
+  else
+  {
+    still_good = false;
+  }
+  if ( still_good && (argv[2] != nullptr) )
+  {
+    Serial.print("Sending message: <");
+    Serial.print(argv[2]);
+    Serial.print("> to ");
+    Serial.print(ipaddr);
+    Serial.printlnf(":%d",port);
 
+    send_udp_packet(ipaddr, port, argv[2]);
+  }
+  return (still_good == true) ? 1 : 0;
 }
 
 void send_udp_packet(IPAddress ipaddr, int port, String payload) {
   UDP udp;
-  udp.beginPacket(ipaddr, port);
-  udp.write(payload);
-  udp.endPacket();
-}
+  char buf[65];
+  payload.toCharArray(buf,64);
+  udp.sendPacket(buf, 64, ipaddr, port);
+  }
 
-String* split_string(String str, char c, String* str_array, int len) {
-  
+String* split_string(String str, char c, String* str_array, int n) {
+  // n is max number of characters to split on. Must be at least 
+  // one less than size of str_array
   int idx = 0;
   int i = 0;
-  for (i = 0; (i < len) && (idx < str.length()); ++i)
+  for ( i = 0; (i < n) && (idx < str.length()); ++i )
   {
-    int jdx = arg_list.indexOf(c, idx);
-    if (jdx != -1)
+    int jdx = str.indexOf(c, idx);
+    if ( jdx == -1 )
     {
-      str_array[i] = arg_list.substring(idx,jdx).trim();
-      idx = jdx + 1;
+      jdx = str.length();
     }
-    else
-    {
-      break;
-    }
+    str_array[i] = str.substring(idx,jdx).trim();
+    idx = jdx + 1;
   }
   str_array[i] = nullptr;
   return str_array;

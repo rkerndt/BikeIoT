@@ -18,6 +18,7 @@
 #define NAME_PUBLIC_IP_ADDR  "public_ip"
 #define NAME_PUBLIC_IP_TOPIC "spark/device/ip"
 #define NAME_GET_PUBLIC_IP   "get_ip"
+#define NAME_SEND_UDP        "send_udp"
 
 // Function declarations
 void publish_updates(void);
