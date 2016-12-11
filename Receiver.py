@@ -126,9 +126,6 @@ def main(args):
             log_fh.flush()
             log_fh.close()
         exit()
-    except:
-        GPIO.cleanup()
-        raise
 
 if __name__ == "__main__":
     main(sys.argv)

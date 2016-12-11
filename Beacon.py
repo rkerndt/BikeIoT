@@ -4,36 +4,44 @@ from multiprocessing import Process, Queue
 from Queue import Empty
 import subprocess
 import time
+import os
+import re
 
 from bluepy import btle
 import grovepi
 import picamera
 import serial
 
+DEBUG = False
+CELL = False  # Debugging other functions goes faster w/o cellular
+
 LOOP_ON = '01'
 LOOP_OFF = '00'
 
-BT_PERIOD = 60  # How often to clear the bluetooth device list and start over
-LORA_BROADCAST_PERIOD = 5  # Seconds between each Lora braodcast
-LORA_NETWORK_PERIOD = 60*60  # Seconds between trying to reconnect to LoRa
-CELL_PERIOD = 10  # At least ~540 should be the final to use 1 mb per month
+IMG_PATH = '/home/pi/Images/'
+
+BROADCAST_PERIOD = 60*60  # At least ~540 to use 1 mb per month
+if DEBUG:
+    BROADCAST_PERIOD = 5
+CAM_PERIOD = 12  # How often to take a picture
+if DEBUG:
+    CAM_PERIOD = 5
 SCAN_LEN = 2  # How long to scan bluetooth at one time
 
-# Set up start times
-bt_time = time.time()  # Init time for bluetooth device count cycles
-lora_broadcast_time = time.time()  # Init time for LoRa cycles
-lora_network_time = time.time()  # Init time for Lora Connection
-lora_network_time -= LORA_NETWORK_PERIOD  # Will attempt to connect right away
-cell_time = time.time()  # Init time for cell cycles
-start_time = time.time()  # Init time for program run time
+# Initialize start time for periodic events
+broadcast_time = time.time()
+broadcast_time -= BROADCAST_PERIOD  # Makes particle broadcast immediately
+cam_time = time.time()
 
 # Set up grovepi
 LOUDNESS_SENSOR = 0  # Connect to A0
 TEMP_HUM_SENSOR = 6  # Connect to D6
-SWITCH = 5
-grovepi.pinMode(LOUDNESS_SENSOR, "INPUT")
-grovepi.pinMode(TEMP_HUM_SENSOR, "INPUT")
-grovepi.pinMode(SWITCH, "INPUT")
+LOOP = 3  # Connect to D5
+LED = 2
+grovepi.pinMode(LOUDNESS_SENSOR, 'INPUT')
+grovepi.pinMode(TEMP_HUM_SENSOR, 'INPUT')
+grovepi.pinMode(LOOP, 'INPUT')
+grovepi.pinMode(TEMP_HUM_SENSOR, 'OUTPUT')
 grove_queue = Queue()
 grove_data = []
 
@@ -42,9 +50,6 @@ devices = []
 sc = btle.Scanner(0)
 
 # Initialize serial
-lora_device = '/dev/ttyUSB0'
-lora_baudrate = 115200
-lora_ser = serial.Serial(lora_device, lora_baudrate)
 cell_device = '/dev/ttyACM0'
 cell_baudrate = 115200
 cell_ser = serial.Serial(cell_device, cell_baudrate)
@@ -52,12 +57,10 @@ cell_ser = serial.Serial(cell_device, cell_baudrate)
 # Data to send to cell
 broadcast_data = []
 old_broadcast_data = []
-prefixes = ["devs", "ld", "temp", "hum"]  # Should match gateway MQTT order
+prefixes = ['devs', 'ld', 'temp', 'hum', 'pics']
 
 # Initialize camera
 cam = picamera.PiCamera()
-
-lora_network_status = False
 
 
 def bt_process():
@@ -67,8 +70,11 @@ def bt_process():
             data = get_data()
             set_queue_data(data)
             broadcast(data[0])
+            # Diagnostic
+            grovepi.digitalWrite(LED, data[0])
     except IOError:
-        print 'IOError detected and excepted'
+        if DEBUG:
+            print 'IOError detected and excepted'
         pass
 
 
@@ -102,15 +108,10 @@ def cleanup():
     """Clean up at program end."""
     broadcast_proc.terminate()
     subprocess.call('sudo hciconfig hci0 noleadv', shell=True)
-    ser_command('Cell off', cell_ser)
-    lora_ser.close()
-    cell_ser.close()
-    # Print how long the program ran for
-    now = time.time()
-    print (now - start_time) // 60,
-    print " min ",
-    print now % 60,
-    print "sec"
+    if CELL:
+        ser_command('Cell off', cell_ser)
+        cell_ser.close()
+    grovepi.digitalWrite(LED, 0)
 
 
 def get_data():
@@ -125,13 +126,24 @@ def get_data():
     return [loopstate, loudness, temp, hum]
 
 
+def get_space():
+    """Return what percent of space is left for images."""
+    df = subprocess.Popen(['df', IMG_PATH], stdout=subprocess.PIPE)
+    output = df.communicate()[0]
+    output = output.split('\n')[1]
+    output = re.sub(' +', ' ', output)  # Remove repeat spaces
+    output = output.split(' ')[4]
+    output = int(output[0])
+    return output
+
+
 def get_loopstate():
     """
     Get state of loop, with whatever the system ends up being.
 
     For now, since it's grovepi, don't call in multiple threads
     """
-    return grovepi.digitalRead(SWITCH)
+    return grovepi.digitalRead(LOOP)
 
 
 def get_queue_data():
@@ -149,45 +161,27 @@ def get_queue_data():
     return grove_data
 
 
-def lora_join_network(timeout=-1):
-    """
-    Send AT command to join LoRa network.
-
-    Timout of -1 means wait for connection forever, 0 means don't wait at all.
-    """
-    str = ''
-    start_time = time.time()
-    while(not (str == 'Successfully joined network\r\n')):
-        str = ser_command('AT+JOIN\n', lora_ser, [
-            'Join Error - Failed to join network\r\n',
-            'Successfully joined network\r\n'])
-        if (timeout >= 0 and time.time() - start_time > timeout):
-            return False
-    return True
-
-
 def ser_command(str, ser, responses=['OK\r\n']):
     """Send command over serial, then returns its response."""
     ser.write(str)
-    if ser == lora_ser:
-        ser.readline()
     msg = ''
     while (msg not in responses):
         try:
             msg = ser.readline()
         except OSError, serial.SerialException:
-            print 'Unable to read. Is something else using the serial port?'
+            if DEBUG:
+                print 'Unable to read. Is something else using the port?'
     return msg
 
 
 def set_queue_data(data):
-    """Set loopstate in queue."""
+    """Set data in queue."""
     while(not grove_queue.empty):
         grove_queue.get()
     grove_queue.put(data)
 
 
-def take_img(folder_path='/home/pi/Images/'):
+def take_img(folder_path):
     """Take picture."""
     title = folder_path + time.ctime() + '.jpg'
     title = title.replace(' ', '_')
@@ -198,14 +192,16 @@ def take_img(folder_path='/home/pi/Images/'):
 # Setup code for before running loop
 broadcast_proc = Process(target=bt_process)
 # Turn on cellular
-ser_command('Cell on', cell_ser)
+if CELL:
+    ser_command('Cell on', cell_ser)
 
 # Main loop
 while(True):
     try:
         # Start bluetooth broadcast in parallel
         if not broadcast_proc.is_alive():
-            print 'Starting new bluetooth process'
+            if DEBUG:
+                print 'Starting new bluetooth process'
             del(broadcast_proc)
             broadcast_proc = Process(target=bt_process)
             broadcast_proc.start()
@@ -214,30 +210,31 @@ while(True):
         data = get_queue_data()
         # If there's no data, wait a bit
         if (len(data) == 0):
-            print 'Waiting for queue data' + '\r',
+            if DEBUG:
+                print 'Waiting for queue data' + '\r',
             continue
 
-        # Print sensor data
-        print '\n** Sensor data **'
-        print 'Loudness: ' + str(data[1])
-        print 'Temperature: ' + str(data[2])
-        print 'Humidity: ' + str(data[3])
-        print '*****************\n'
+        if DEBUG:
+            # Print sensor data
+            print '\n** Sensor data **'
+            print 'Loudness: ' + str(data[1])
+            print 'Temperature: ' + str(data[2])
+            print 'Humidity: ' + str(data[3])
+            print '*****************\n'
 
-        # Check LoRa network status
-        if (time.time() - lora_network_time > LORA_NETWORK_PERIOD):
-            if(ser_command(
-                        'AT+NJS\n', lora_ser, ['0\r\n', '1\r\n']) == '0\r\n'):
-                    lora_join_network(5)
-                    if lora_network_status:
-                        print 'Network joined successfully!'
-                    else:
-                        print 'Network join failed.'
-            lora_network_time = time.time()
+        # Take picture
+        if time.time() - cam_time > CAM_PERIOD:
+            cam_time = time.time()
+            if not (time.localtime().tm_hour > 21 or time.localtime().tm_hour < 5):
+                if DEBUG:
+                    print 'Space left: %d%%' % get_space()
+                if get_space() < 95:
+                    take_img(IMG_PATH)
 
-        # Take picture if loop is triggered
-        if data[0]:
-            take_img()
+        # Get number of images taken
+        pics = len(os.listdir(IMG_PATH))
+        if DEBUG:
+            print 'Pics: %d' % pics
 
         # Check for new devices
         scan_devices = sc.scan(SCAN_LEN)
@@ -247,49 +244,37 @@ while(True):
                     break
             else:
                 devices.append(s_dev)
-        # Print device count
-        print 'Devices found since ',
-        print time.ctime(bt_time),
-        print ' : %d\n' % len(devices)
-        # Check if we need to refresh the list
-        if(time.time() - bt_time > BT_PERIOD):
-            devices = []
-            bt_time = time.time()
+        if DEBUG:
+            # Print device count
+            print 'Devices found since ',
+            print broadcast_time
 
         broadcast_data = data[1:4]
         broadcast_data.insert(0, len(devices))
-
-        # Lora broadcast
-        if (time.time() - lora_broadcast_time > LORA_BROADCAST_PERIOD) and (
-                lora_network_status):
-            # Create message to broadcast
-            lora_msg = ''
-            for d in broadcast_data:
-                lora_msg += str(d) + ','
-            # Get rid of last comma, add newline
-            lora_msg = lora_msg[:len(lora_msg) - 1] + '\n'
-            # Send broadcast
-            loraMsg = 'AT+SEND=' + lora_msg
-            ser_command(lora_msg, lora_ser)
-            lora_broadcast_time = time.time()
+        broadcast_data.insert(len(broadcast_data) - 1, pics)
 
         # Cell broadcast
-        if (len(old_broadcast_data) != 0) and (
-                time.time() - cell_time) > CELL_PERIOD:
-            # Create message to broadcast
-            cell_msg = '{'
-            for i, d in enumerate(broadcast_data):
-                cell_msg += '"' + prefixes[i] + '":' + str(d) + ','
-            cell_msg = cell_msg[:len(cell_msg) - 1] + '}'
-            print 'Old data: %s' % old_broadcast_data
-            print 'New data: %s' % broadcast_data
-            print 'Cell message: ' + cell_msg + '\n'
-            # Send broadcast
-            ser_command(cell_msg, cell_ser)
-            cell_time = time.time()
+        if (len(old_broadcast_data) != 0) and ((
+                time.time() - broadcast_time) > BROADCAST_PERIOD):
+            if CELL:
+                # Create message to broadcast
+                cell_msg = '{'
+                for i, d in enumerate(broadcast_data):
+                    cell_msg += '"' + prefixes[i] + '":' + str(d) + ','
+                cell_msg = cell_msg[:len(cell_msg) - 1] + '}'
+                if DEBUG:
+                    print 'Old data: %s' % old_broadcast_data
+                    print 'New data: %s' % broadcast_data
+                    print 'Cell message: ' + cell_msg + '\n'
+                # Send broadcast
+                ser_command(cell_msg, cell_ser)
+                broadcast_time = time.time()
+            # Wipe bluetooth devices after sending cell message
+            devices = []
         old_broadcast_data = broadcast_data
 
-        print 'Cycled'
+        if DEBUG:
+            print 'Cycled'
     except:
         cleanup()
         raise
