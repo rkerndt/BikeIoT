@@ -193,7 +193,7 @@ def take_img(folder_path):
 
 def main():
   # Setup code for before running loop
-  broadcast_proc = Process(target=bt_process)
+  global broadcast_proc = Process(target=bt_process)
   # Turn on cellular
   if CELL:
         ser_command('Cell on', cell_ser)
