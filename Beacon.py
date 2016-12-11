@@ -193,7 +193,7 @@ def take_img(folder_path):
 
 
 def main():
-    global broadcast_proc, cam_time
+    global broadcast_proc, cam_time, devices
     # Setup code for before running loop
     broadcast_proc = Process(target=bt_process)
     # Turn on cellular
