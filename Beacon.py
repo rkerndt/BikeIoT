@@ -64,7 +64,7 @@ prefixes = ['devs', 'ld', 'temp', 'hum', 'pics']
 cam = picamera.PiCamera()
 
 # Bluetooth proccess thread
-broadcast_proc
+broadcast_proc = None
 
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
