@@ -280,3 +280,7 @@ def main():
       except:
           cleanup()
           raise
+
+if __name__() == '__main__':
+  main()
+  
