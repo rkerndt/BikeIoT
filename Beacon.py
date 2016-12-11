@@ -64,7 +64,7 @@ prefixes = ['devs', 'ld', 'temp', 'hum', 'pics']
 cam = picamera.PiCamera()
 
 # Bluetooth proccess thread
-global broadcast_proc
+broadcast_proc
 
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
@@ -193,7 +193,7 @@ def take_img(folder_path):
 
 
 def main():
-    global broadcast_proc
+    global broadcast_proc, cam_time
     # Setup code for before running loop
     broadcast_proc = Process(target=bt_process)
     # Turn on cellular
