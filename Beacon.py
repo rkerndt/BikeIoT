@@ -107,6 +107,7 @@ def broadcast(loopstate):
 
 
 def cleanup():
+    global broadcast_proc
     """Clean up at program end."""
     broadcast_proc.terminate()
     subprocess.call('sudo hciconfig hci0 noleadv', shell=True)
@@ -192,14 +193,16 @@ def take_img(folder_path):
 
 
 def main():
-  # Setup code for before running loop
-  global broadcast_proc = Process(target=bt_process)
-  # Turn on cellular
-  if CELL:
+    global broadcast_proc
+    # Setup code for before running loop
+    broadcast_proc = Process(target=bt_process)
+    # Turn on cellular
+    if CELL:
         ser_command('Cell on', cell_ser)
 
   # Main loop
   while(True):
+      `global broadcast_proc
       try:
           # Start bluetooth broadcast in parallel
           if not broadcast_proc.is_alive():
