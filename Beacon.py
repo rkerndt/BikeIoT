@@ -50,9 +50,10 @@ devices = []
 sc = btle.Scanner(0)
 
 # Initialize serial
-cell_device = '/dev/ttyACM0'
-cell_baudrate = 115200
-cell_ser = serial.Serial(cell_device, cell_baudrate)
+if CELL:
+    cell_device = '/dev/ttyACM0'
+    cell_baudrate = 115200
+    cell_ser = serial.Serial(cell_device, cell_baudrate)
 
 # Data to send to cell
 broadcast_data = []
@@ -254,27 +255,28 @@ def main():
           broadcast_data.insert(len(broadcast_data) - 1, pics)
 
           # Cell broadcast
-          if (len(old_broadcast_data) != 0) and ((
-              time.time() - broadcast_time) > BROADCAST_PERIOD):
-              if CELL:
-                  # Create message to broadcast
-                  cell_msg = '{'
-                  for i, d in enumerate(broadcast_data):
-                      cell_msg += '"' + prefixes[i] + '":' + str(d) + ','
-                  cell_msg = cell_msg[:len(cell_msg) - 1] + '}'
-                  if DEBUG:
-                      print 'Old data: %s' % old_broadcast_data
-                      print 'New data: %s' % broadcast_data
-                      print 'Cell message: ' + cell_msg + '\n'
-                  # Send broadcast
-                  ser_command(cell_msg, cell_ser)
-                  broadcast_time = time.time()
-              # Wipe bluetooth devices after sending cell message
-              devices = []
-          old_broadcast_data = broadcast_data
+          if CELL:
+              if (len(old_broadcast_data) != 0) and ((
+                  time.time() - broadcast_time) > BROADCAST_PERIOD):
+                  if CELL:
+                      # Create message to broadcast
+                      cell_msg = '{'
+                      for i, d in enumerate(broadcast_data):
+                          cell_msg += '"' + prefixes[i] + '":' + str(d) + ','
+                      cell_msg = cell_msg[:len(cell_msg) - 1] + '}'
+                      if DEBUG:
+                          print 'Old data: %s' % old_broadcast_data
+                          print 'New data: %s' % broadcast_data
+                          print 'Cell message: ' + cell_msg + '\n'
+                      # Send broadcast
+                      ser_command(cell_msg, cell_ser)
+                      broadcast_time = time.time()
+                  # Wipe bluetooth devices after sending cell message
+                  devices = []
+              old_broadcast_data = broadcast_data
 
-          if DEBUG:
-              print 'Cycled'
+              if DEBUG:
+                  print 'Cycled'
       except:
           cleanup()
           raise
