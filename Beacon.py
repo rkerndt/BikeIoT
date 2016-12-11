@@ -202,7 +202,7 @@ def main():
 
     # Main loop
     while(True):
-      ` global broadcast_proc
+        global broadcast_proc
         try:
             # Start bluetooth broadcast in parallel
             if not broadcast_proc.is_alive():
