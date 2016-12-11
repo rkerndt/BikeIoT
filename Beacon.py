@@ -212,13 +212,10 @@ def main():
                 broadcast_proc.start()
 
             # Get sensor data
-            data = get_queue_data()
-            # If there's no data, wait a bit
-            if (len(data) == 0):
-                if DEBUG:
-                    print 'Waiting for queue data' + '\r',
-                continue
-
+            data = []
+            while len(data) == 0:
+                data = get_queue_data()
+                
             if DEBUG:
                 # Print sensor data
                 print '\n** Sensor data **'
@@ -227,8 +224,8 @@ def main():
                 print 'Humidity: ' + str(data[3])
                 print '*****************\n'
 
-            # Take picture
-            if time.time() - cam_time > CAM_PERIOD:
+            # Take picture only when loop detected
+            if data[0] and (time.time() - cam_time > CAM_PERIOD):
                 cam_time = time.time()
                 if not (time.localtime().tm_hour > 21 or time.localtime().tm_hour < 5):
                     if DEBUG:
