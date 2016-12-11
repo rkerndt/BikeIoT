@@ -200,91 +200,91 @@ def main():
     if CELL:
         ser_command('Cell on', cell_ser)
 
-  # Main loop
-  while(True):
-      `global broadcast_proc
-      try:
-          # Start bluetooth broadcast in parallel
-          if not broadcast_proc.is_alive():
-              if DEBUG:
-                  print 'Starting new bluetooth process'
-              del(broadcast_proc)
-              broadcast_proc = Process(target=bt_process)
-              broadcast_proc.start()
+    # Main loop
+    while(True):
+      ` global broadcast_proc
+        try:
+            # Start bluetooth broadcast in parallel
+            if not broadcast_proc.is_alive():
+                if DEBUG:
+                    print 'Starting new bluetooth process'
+                del(broadcast_proc)
+                broadcast_proc = Process(target=bt_process)
+                broadcast_proc.start()
 
-          # Get sensor data
-          data = get_queue_data()
-          # If there's no data, wait a bit
-          if (len(data) == 0):
-              if DEBUG:
-                  print 'Waiting for queue data' + '\r',
-              continue
+            # Get sensor data
+            data = get_queue_data()
+            # If there's no data, wait a bit
+            if (len(data) == 0):
+                if DEBUG:
+                    print 'Waiting for queue data' + '\r',
+                continue
 
-          if DEBUG:
-              # Print sensor data
-              print '\n** Sensor data **'
-              print 'Loudness: ' + str(data[1])
-              print 'Temperature: ' + str(data[2])
-              print 'Humidity: ' + str(data[3])
-              print '*****************\n'
+            if DEBUG:
+                # Print sensor data
+                print '\n** Sensor data **'
+                print 'Loudness: ' + str(data[1])
+                print 'Temperature: ' + str(data[2])
+                print 'Humidity: ' + str(data[3])
+                print '*****************\n'
 
-          # Take picture
-          if time.time() - cam_time > CAM_PERIOD:
-              cam_time = time.time()
-              if not (time.localtime().tm_hour > 21 or time.localtime().tm_hour < 5):
-                  if DEBUG:
-                      print 'Space left: %d%%' % get_space()
-                  if get_space() < 95:
-                      take_img(IMG_PATH)
+            # Take picture
+            if time.time() - cam_time > CAM_PERIOD:
+                cam_time = time.time()
+                if not (time.localtime().tm_hour > 21 or time.localtime().tm_hour < 5):
+                    if DEBUG:
+                        print 'Space left: %d%%' % get_space()
+                    if get_space() < 95:
+                        take_img(IMG_PATH)
 
-          # Get number of images taken
-          pics = len(os.listdir(IMG_PATH))
-          if DEBUG:
-              print 'Pics: %d' % pics
+            # Get number of images taken
+            pics = len(os.listdir(IMG_PATH))
+            if DEBUG:
+                print 'Pics: %d' % pics
 
-          # Check for new devices
-          scan_devices = sc.scan(SCAN_LEN)
-          for s_dev in scan_devices:
-              for dev in devices:
-                  if dev.addr == s_dev.addr:
-                      break
-              else:
-                  devices.append(s_dev)
-          if DEBUG:
-              # Print device count
-              print 'Devices found since ',
-              print broadcast_time
+            # Check for new devices
+            scan_devices = sc.scan(SCAN_LEN)
+            for s_dev in scan_devices:
+                for dev in devices:
+                    if dev.addr == s_dev.addr:
+                        break
+                else:
+                    devices.append(s_dev)
+            if DEBUG:
+                # Print device count
+                print 'Devices found since ',
+                print broadcast_time
 
-          broadcast_data = data[1:4]
-          broadcast_data.insert(0, len(devices))
-          broadcast_data.insert(len(broadcast_data) - 1, pics)
+            broadcast_data = data[1:4]
+            broadcast_data.insert(0, len(devices))
+            broadcast_data.insert(len(broadcast_data) - 1, pics)
 
-          # Cell broadcast
-          if CELL:
-              if (len(old_broadcast_data) != 0) and ((
-                  time.time() - broadcast_time) > BROADCAST_PERIOD):
-                  if CELL:
-                      # Create message to broadcast
-                      cell_msg = '{'
-                      for i, d in enumerate(broadcast_data):
-                          cell_msg += '"' + prefixes[i] + '":' + str(d) + ','
-                      cell_msg = cell_msg[:len(cell_msg) - 1] + '}'
-                      if DEBUG:
-                          print 'Old data: %s' % old_broadcast_data
-                          print 'New data: %s' % broadcast_data
-                          print 'Cell message: ' + cell_msg + '\n'
-                      # Send broadcast
-                      ser_command(cell_msg, cell_ser)
-                      broadcast_time = time.time()
-                  # Wipe bluetooth devices after sending cell message
-                  devices = []
-              old_broadcast_data = broadcast_data
+            # Cell broadcast
+            if CELL:
+                if (len(old_broadcast_data) != 0) and ((
+                    time.time() - broadcast_time) > BROADCAST_PERIOD):
+                    if CELL:
+                        # Create message to broadcast
+                        cell_msg = '{'
+                        for i, d in enumerate(broadcast_data):
+                            cell_msg += '"' + prefixes[i] + '":' + str(d) + ','
+                        cell_msg = cell_msg[:len(cell_msg) - 1] + '}'
+                        if DEBUG:
+                            print 'Old data: %s' % old_broadcast_data
+                            print 'New data: %s' % broadcast_data
+                            print 'Cell message: ' + cell_msg + '\n'
+                        # Send broadcast
+                        ser_command(cell_msg, cell_ser)
+                        broadcast_time = time.time()
+                    # Wipe bluetooth devices after sending cell message
+                    devices = []
+                old_broadcast_data = broadcast_data
 
-              if DEBUG:
-                  print 'Cycled'
-      except:
-          cleanup()
-          raise
+                if DEBUG:
+                    print 'Cycled'
+        except:
+            cleanup()
+            raise
 
 if __name__ == '__main__':
   main()
