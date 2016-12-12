@@ -6,6 +6,7 @@ import subprocess
 import time
 import os
 import re
+import signal
 
 from bluepy import btle
 import grovepi
@@ -74,6 +75,10 @@ if TAKE_PICS:
 # Bluetooth proccess thread
 broadcast_proc = None
 
+def sig_handler(signum, frame):
+  # call cleanup on signal
+  cleanup()
+  
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
 
@@ -211,9 +216,14 @@ def main():
     global broadcast_proc, cam_time, devices
     # Setup code for before running loop
     broadcast_proc = Process(target=bt_process)
+
     # Turn on cellular
     if CELL:
         ser_command('Cell on', cell_ser)
+
+    # handle sigterm and sigint to exit gracefully
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
 
     # Main loop
     while(True):

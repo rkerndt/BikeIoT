@@ -1,0 +1,17 @@
+# Rickie Kerndt <rkerndt@cs.uoregon.edu>
+# systemd service file to start, status and shutdown the bike loop beacon
+# This file should be located under directory /etc/systemd/system
+
+[Unit]
+  Description=Bluetooth LE Traffic Light Loop Beacon
+  Requires=bluetooth.service
+  After=bluetooth.service
+
+[Service]
+  Type=idle
+  KillMode=process
+  ExecStart=/home/pi/Beacon.sh
+
+[Install]
+  WantedBy=multi-user.target
+
