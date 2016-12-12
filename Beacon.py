@@ -49,16 +49,16 @@ grove_data = []
 devices = []
 sc = btle.Scanner(0)
 
-# Initialize serial
+# Cell configuration (if enabled)
 if CELL:
     cell_device = '/dev/ttyACM0'
     cell_baudrate = 115200
     cell_ser = serial.Serial(cell_device, cell_baudrate)
 
-# Data to send to cell
-broadcast_data = []
-old_broadcast_data = []
-prefixes = ['devs', 'ld', 'temp', 'hum', 'pics']
+    # Data to send to cell
+    broadcast_data = []
+    old_broadcast_data = []
+    prefixes = ['devs', 'ld', 'temp', 'hum', 'pics']
 
 # Initialize camera
 cam = picamera.PiCamera()
@@ -68,12 +68,17 @@ broadcast_proc = None
 
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
+
+    # only call broadcast when loopstate has changed
+    previous = None
     try:
         while(True):
             data = get_data()
             set_queue_data(data)
-            broadcast(data[0])
-            grovepi.digitalWrite(LED, data[0])
+            if prevous != data[0]:
+                previous = data[0]
+                broadcast(data[0])
+                grovepi.digitalWrite(LED, data[0])
     except IOError:
         if DEBUG:
             print 'IOError detected and excepted'
@@ -99,11 +104,11 @@ def broadcast(loopstate):
     cmdstring += '42 69 63 79 63 6c 65 '  # Header to identify beacon message-
     # - and it's also is Bicycle in ASCII!
     if loopstate:
-            cmdstring = cmdstring + LOOP_ON
+            cmdstring = cmdstring + LOOP_ON + ' &>/dev/null'
     else:
-        cmdstring = cmdstring + LOOP_OFF + ' >/dev/null 2>&1'
+        cmdstring = cmdstring + LOOP_OFF + ' &>/dev/null'
     subprocess.call(cmdstring, shell=True)
-    subprocess.call('sudo hciconfig hci0 leadv 3 >/dev/null 2>&1', shell=True)
+    subprocess.call('sudo hciconfig hci0 leadv 3 &>dev/null', shell=True)
 
 
 def cleanup():
@@ -111,6 +116,8 @@ def cleanup():
     """Clean up at program end."""
     broadcast_proc.terminate()
     subprocess.call('sudo hciconfig hci0 noleadv', shell=True)
+    subprocess.call('sudo hciconfig hci0 reset', shell=True)
+    subprocess.call('sudo hciconfig hci0 down', shell=True)
     if CELL:
         ser_command('Cell off', cell_ser)
         cell_ser.close()
