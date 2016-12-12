@@ -116,7 +116,7 @@ def broadcast(loopstate):
     else:
         cmdstring = cmdstring + LOOP_OFF + ' &>/dev/null'
     subprocess.call(cmdstring, shell=True)
-    subprocess.call('sudo hciconfig hci0 leadv 3 &>dev/null', shell=True)
+    subprocess.call('sudo hciconfig hci0 leadv 3 &>/dev/null', shell=True)
 
 
 def cleanup():
