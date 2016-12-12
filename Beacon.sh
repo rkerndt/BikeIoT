@@ -16,5 +16,5 @@ do
 done
 
 sudo hciconfig hci0 up
-sudo hciconfig hcio noscanc
+sudo hciconfig hci0 noscanc
 sudo python /home/pi/Beacon.py
