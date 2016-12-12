@@ -14,10 +14,12 @@ import serial
 
 DEBUG = False
 CELL = False  # Debugging other functions goes faster w/o cellular
+SCAN_BLUETOOTH = False # Whether we scan bluetooth for device addresses
+TAKE_PICS = True # Whether we take pictures when loop state is on
 
 LOOP_ON = '01'
 LOOP_OFF = '00'
-
+MIN_DISK_SPACE = 95
 IMG_PATH = '/home/pi/Images/'
 
 BROADCAST_PERIOD = 60*60  # At least ~540 to use 1 mb per month
@@ -45,13 +47,18 @@ grovepi.pinMode(TEMP_HUM_SENSOR, 'OUTPUT')
 grove_queue = Queue()
 grove_data = []
 
-# Setup bluetooth
-devices = []
-sc = btle.Scanner(0)
+# TODO: scanning bluetooth and cell broadcast are intertwined since the
+# bluetooth scans are being broadcast over cell. Seperate this out or
+# drop bluetooth scanning.
 
-# Cell configuration (if enabled)
+if SCAN_BLUETOOTH:
+    # Setup bluetooth
+    devices = []
+    sc = btle.Scanner(0)
+
 if CELL:
-    cell_device = '/dev/ttyACM0'
+    # Cell configuration
+    cell_device = '/dev/ttyACM0' # this is probably wrong!
     cell_baudrate = 115200
     cell_ser = serial.Serial(cell_device, cell_baudrate)
 
@@ -60,8 +67,9 @@ if CELL:
     old_broadcast_data = []
     prefixes = ['devs', 'ld', 'temp', 'hum', 'pics']
 
-# Initialize camera
-cam = picamera.PiCamera()
+if TAKE_PICS:
+    # Initialize camera
+    cam = picamera.PiCamera()
 
 # Bluetooth proccess thread
 broadcast_proc = None
@@ -69,13 +77,13 @@ broadcast_proc = None
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
 
-    # only call broadcast when loopstate has changed
+    # only do something when loop state has changed
     previous = None
     try:
         while(True):
             data = get_data()
             set_queue_data(data)
-            if prevous != data[0]:
+            if previous != data[0]:
                 previous = data[0]
                 broadcast(data[0])
                 grovepi.digitalWrite(LED, data[0])
@@ -231,36 +239,35 @@ def main():
                 print 'Humidity: ' + str(data[3])
                 print '*****************\n'
 
-            # Take picture only when loop detected
-            if data[0] and (time.time() - cam_time > CAM_PERIOD):
+            # Take picture only when loop detected at CAM_PERIOD interval
+            if TAKE_PICS and data[0] and (time.time() - cam_time > CAM_PERIOD):
                 cam_time = time.time()
-                if not (time.localtime().tm_hour > 21 or time.localtime().tm_hour < 5):
-                    if DEBUG:
+                if DEBUG:
                         print 'Space left: %d%%' % get_space()
-                    if get_space() < 95:
-                        take_img(IMG_PATH)
+                if get_space() < MIN_DISK_SPACE:
+                    take_img(IMG_PATH)
+                # Get number of images taken
+                pics = len(os.listdir(IMG_PATH))
+                if DEBUG:
+                  print 'Pics: %d' % pics
 
-            # Get number of images taken
-            pics = len(os.listdir(IMG_PATH))
-            if DEBUG:
-                print 'Pics: %d' % pics
+            if SCAN_BLUETOOTH:
+                # Check for new devices
+                scan_devices = sc.scan(SCAN_LEN)
+                for s_dev in scan_devices:
+                    for dev in devices:
+                        if dev.addr == s_dev.addr:
+                            break
+                    else:
+                        devices.append(s_dev)
+                if DEBUG:
+                    # Print device count
+                    print 'Devices found since ',
+                    print broadcast_time
 
-            # Check for new devices
-            scan_devices = sc.scan(SCAN_LEN)
-            for s_dev in scan_devices:
-                for dev in devices:
-                    if dev.addr == s_dev.addr:
-                        break
-                else:
-                    devices.append(s_dev)
-            if DEBUG:
-                # Print device count
-                print 'Devices found since ',
-                print broadcast_time
-
-            broadcast_data = data[1:4]
-            broadcast_data.insert(0, len(devices))
-            broadcast_data.insert(len(broadcast_data) - 1, pics)
+                broadcast_data = data[1:4]
+                broadcast_data.insert(0, len(devices))
+                broadcast_data.insert(len(broadcast_data) - 1, pics)
 
             # Cell broadcast
             if CELL:
