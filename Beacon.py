@@ -12,7 +12,7 @@ from bluepy import btle
 import grovepi
 import picamera
 import serial
-import sys.stderr
+import sys
 
 DEBUG = True
 CELL = False  # Debugging other functions goes faster w/o cellular
@@ -23,7 +23,7 @@ LOOP_OFF = '00'
 MIN_DISK_SPACE = 95
 IMG_PATH = '/home/pi/Images/'
 HCI_DEVICE = hci0
-OUT_FILE = stderr
+OUT_FILE = sys.stderr
 
 BROADCAST_PERIOD = 60*60  # At least ~540 to use 1 mb per month
 if DEBUG:
@@ -115,7 +115,6 @@ def bt_process():
     except IOError as e:
         if DEBUG:
             print('IOError detected and excepted: %s' % (str(e),),file=OUT_FILE)
-        pass
     except:
       message = "Unexpected error: %s" % sys.exc_into()[0]
       raise Beacon_Error(message)
