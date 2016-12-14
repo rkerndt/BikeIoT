@@ -146,7 +146,8 @@ def broadcast(loopstate):
 def cleanup():
     global broadcast_proc
     """Clean up at program end."""
-    broadcast_proc.terminate()
+    if broadcast_proc:
+        broadcast_proc.terminate()
     subprocess.call('sudo hciconfig hci0 noleadv', shell=True)
     subprocess.call('sudo hciconfig hci0 reset', shell=True)
     subprocess.call('sudo hciconfig hci0 down', shell=True)
