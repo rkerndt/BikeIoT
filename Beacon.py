@@ -45,7 +45,6 @@ grovepi.pinMode(TEMP_HUM_SENSOR, 'INPUT')
 grovepi.pinMode(LOOP, 'INPUT')
 grovepi.pinMode(TEMP_HUM_SENSOR, 'OUTPUT')
 grove_queue = Queue()
-grove_data = []
 
 # TODO: scanning bluetooth and cell broadcast are intertwined since the
 # bluetooth scans are being broadcast over cell. Seperate this out or
@@ -228,17 +227,15 @@ def get_loopstate():
 
 def get_queue_data():
     """
-    Get loopstate from queue.
-
-    Safe for all theads.
+    Get loopstate from queue using non-blocking get.
+    Safe for all theads. Returns None if get times out.
     """
-    global grove_data
+    data = None
     try:
-        grove_data = grove_queue.get_nowait()
+        data = grove_queue.get(True, 1)
     except Empty:
-        # Just use old loopstate if queue is empty
         pass
-    return grove_data
+    return data
 
 
 def ser_command(str, ser, responses=['OK\r\n']):
@@ -256,11 +253,14 @@ def ser_command(str, ser, responses=['OK\r\n']):
 
 
 def set_queue_data(data):
-    """Set data in queue."""
-    while(not grove_queue.empty):
-        grove_queue.get()
-    grove_queue.put(data)
-
+    """Set data in queue using blocking put. If queue is full
+       the  data is lost.
+    """
+    try:
+        grove_queue.put(data)
+    except Full as e:
+        if DEBUG:
+            print('Dropped data %s due to queue full (%d entries)' % (str(data), len(grove_queue))
 
 def take_img(folder_path):
     """Take picture."""
@@ -309,8 +309,8 @@ def main():
                 broadcast_proc.start()
 
             # Get sensor data
-            data = []
-            while len(data) == 0:
+            data = None
+            while not data:
                 data = get_queue_data()
                 
             if DEBUG:
