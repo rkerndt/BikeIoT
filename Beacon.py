@@ -112,7 +112,7 @@ def bt_process():
             if DEBUG:
                 print('IOError occured during get_data() %s' % str(e))
         except:
-            message = "unexpected error (get_data): %s" % sys.exc_into()[0]
+            message = "unexpected error (get_data): %s" % sys.exc_info()[0]
             raise Beacon_Error(message)
             
         # count the number of consecutive times the loop is found on and
@@ -138,7 +138,7 @@ def bt_process():
                 if DEBUG:
                     print('IOError occured during ble broadcast: %s' % str(e))
             except:
-                message = "Unexpected error (ble broadcast): %s" % sys.exc_into()[0]
+                message = "Unexpected error (ble broadcast): %s" % sys.exc_info()[0]
                 raise Beacon_Error(message)
             try:
                 grovepi.digitalWrite(LED, data[0])
@@ -146,7 +146,7 @@ def bt_process():
                 if DEBUG:
                     print('IOError occured during digitalWrite(): %s' % str(e))
             except:
-                message = "Unexpected error (digitalWrite): %s" % sys.exc_into()[0]
+                message = "Unexpected error (digitalWrite): %s" % sys.exc_info()[0]
                 raise Beacon_Error(message)
 
 
@@ -326,12 +326,12 @@ def main():
                 cam_time = time.time()
                 if DEBUG:
                         print('Space left: %d%%' % get_space())
-                if get_space() < MIN_DISK_SPACE:
+                if get_space() > MIN_DISK_SPACE:
                     take_img(IMG_PATH)
                 # Get number of images taken
                 pics = len(os.listdir(IMG_PATH))
                 if DEBUG:
-                  print('Pics: %d' % pics)
+                    print('Pics: %d' % pics)
 
             if SCAN_BLUETOOTH:
                 # Check for new devices
