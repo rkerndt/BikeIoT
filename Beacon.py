@@ -91,7 +91,7 @@ def init_ble():
     if rslt != 0:
       error_msg = "hci up failed with %d" % rslt
     else:
-      rslt = subprocess.call('sudo hciconfig hci0 noscan', shell=True)
+      rslt = subprocess.call('sudo hciconfig hci0 noscanc', shell=True)
     if rslt != 0:
       error_msg = "hci noscan failed with %d" % rslt
     if rslt != 0:
