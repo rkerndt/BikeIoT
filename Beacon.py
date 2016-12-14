@@ -86,15 +86,14 @@ def init_ble():
     rslt = subprocess.call('sudo hcitool hci0 reset', shell=True)
     if rslt !=0:
       error_msg = "hci reset failed with %d" % rslt
-    else:
-      rslt = subprocess.call('sudo hciconfig hci0 up', shell=True)
+      raise Beacon_Error(error_msg)
+    rslt = subprocess.call('sudo hciconfig hci0 up', shell=True)
     if rslt != 0:
       error_msg = "hci up failed with %d" % rslt
-    else:
-      rslt = subprocess.call('sudo hciconfig hci0 noscanc', shell=True)
+      raise Beacon_Error(error_msg)
+    rslt = subprocess.call('sudo hciconfig hci0 noscanc', shell=True)
     if rslt != 0:
-      error_msg = "hci noscan failed with %d" % rslt
-    if rslt != 0:
+      error_msg = "hci noscanc failed with %d" % rslt
       raise Beacon_Error(error_msg)
 
 def bt_process():
