@@ -103,21 +103,21 @@ def bt_process():
     
     # only do something when loop state has changed
     previous = None
-    try:
-        while(True):
+    while(True):
+        try:
             data = get_data()
             set_queue_data(data)
             if previous != data[0]:
                 previous = data[0]
                 broadcast(data[0])
                 grovepi.digitalWrite(LED, data[0])
-            except IOError as e:
-                if DEBUG:
-                print('IOError detected and excepted: %s' % (str(e),))
+        except IOError as e:
+            if DEBUG:
+            print('IOError detected and excepted: %s' % (str(e),))
 
-            except:
-                message = "Unexpected error: %s" % sys.exc_into()[0]
-                raise Beacon_Error(message)
+        except:
+            message = "Unexpected error: %s" % sys.exc_into()[0]
+            raise Beacon_Error(message)
 
 
 def broadcast(loopstate):
