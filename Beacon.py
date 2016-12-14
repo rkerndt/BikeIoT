@@ -1,5 +1,5 @@
 """Program for beacon RPi."""
-from __future__ import print
+from __future__ import print_funtion
 from multiprocessing import Process, Queue
 from Queue import Empty
 import subprocess
