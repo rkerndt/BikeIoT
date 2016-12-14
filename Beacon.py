@@ -234,20 +234,6 @@ def take_img(folder_path):
     title = title.replace(':', '-')
     cam.capture(title)
 
-
-def main():
-    global broadcast_proc, cam_time, devices
-    # Setup code for before running loop
-    broadcast_proc = Process(target=bt_process)
-
-    # Turn on cellular
-    if CELL:
-        ser_command('Cell on', cell_ser)
-
-    # handle sigterm and sigint to exit gracefully
-    signal.signal(signal.SIGTERM, sig_handler)
-    signal.signal(signal.SIGINT, sig_handler)
-
 class Beacon_Error(Exception):
   """
   A class for all that can go wrong with BLE beacons
@@ -261,7 +247,25 @@ class Beacon_Error(Exception):
     def __repr__(self):
       return("Beacon_Error('%s')", self.string)
 
-    # Main loop
+
+def main():
+    global broadcast_proc, cam_time, devices
+
+    # handle sigterm and sigint to exit gracefully
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
+ 
+    # Initialize ble
+    init_ble()
+
+    # Setup code for before running loop
+    broadcast_proc = Process(target=bt_process)
+
+    # Turn on cellular
+    if CELL:
+        ser_command('Cell on', cell_ser)
+
+   # Main loop
     while(True):
         try:
             # Start bluetooth broadcast in parallel
