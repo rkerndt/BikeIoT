@@ -116,17 +116,20 @@ def bt_process():
             message = "unexpected error (get_data): %s" % sys.exc_into()[0]
             raise Beacon_Error(message)
             
-        set_queue_data(data)
-
         # count the number of consecutive times the loop is found on and
         # only set loop state on if above minimum.
         if data[0] == 1:
-          loop_on_count += 1;
-          if loop_on_count > MIN_LOOP_ON_COUNT:
-            current_loop_state = LOOP_ON
+            loop_on_count += 1;
+            if loop_on_count > MIN_LOOP_ON_COUNT:
+                current_loop_state = LOOP_ON
+            else:
+                #keep queue_data in sync with our view of loop state
+                data[0] = 0
         else:
-          loop_on_count = 0;
-          current_loop_state = LOOP_OFF
+            loop_on_count = 0;
+            current_loop_state = LOOP_OFF
+
+        set_queue_data(data)
 
         if previous_loop_state != current_loop_state:
             previous_loop_state = current_loop_state
