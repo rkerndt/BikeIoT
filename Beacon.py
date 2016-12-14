@@ -19,6 +19,7 @@ SCAN_BLUETOOTH = False # Whether we scan bluetooth for device addresses
 TAKE_PICS = True # Whether we take pictures when loop state is on
 LOOP_ON = '01'
 LOOP_OFF = '00'
+MIN_LOOP_ON_COUNT = 1
 MIN_DISK_SPACE = 95
 IMG_PATH = '/home/pi/Images/'
 HCI_DEVICE = 'hci0'
@@ -99,8 +100,12 @@ def bt_process():
 
     init_ble()
     
-    # only do something when loop state has changed
-    previous = None
+    # only do something when loop state has changed and have confidence in
+    # loop on state
+    loop_on_count = 0
+    previous_loop_state = None
+    current_loop_state = LOOP_OFF
+    
     while(True):
         try:
             data = get_data()
@@ -112,10 +117,21 @@ def bt_process():
             raise Beacon_Error(message)
             
         set_queue_data(data)
-        if previous != data[0]:
-            previous = data[0]
+
+        # count the number of consecutive times the loop is found on and
+        # only set loop state on if above minimum.
+        if data[0] == 1:
+          loop_on_count += 1;
+          if loop_on_count > MIN_LOOP_ON_COUNT:
+            current_loop_state = LOOP_ON
+        else:
+          loop_on_count = 0;
+          current_loop_state = LOOP_OFF
+
+        if previous_loop_state != current_loop_state:
+            previous_loop_state = current_loop_state
             try:
-                broadcast(data[0])
+                broadcast(current_loop_state)
             except IOError as e:
                 if DEBUG:
                     print('IOError occured during ble broadcast: %s' % str(e))
