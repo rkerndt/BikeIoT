@@ -10,7 +10,7 @@
 [Service]
   Type=idle
   KillMode=process
-  ExecStart=/home/pi/Beacon.sh
+  ExecStart= python /home/pi/Beacon.py
 
 [Install]
   WantedBy=multi-user.target
