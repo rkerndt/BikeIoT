@@ -131,7 +131,7 @@ def bt_process():
         if previous_loop_state != current_loop_state:
             previous_loop_state = current_loop_state
             try:
-                broadcast(current_loop_state)
+                broadcast(data[0])
             except IOError as e:
                 if DEBUG:
                     print('IOError occured during ble broadcast: %s' % str(e))
