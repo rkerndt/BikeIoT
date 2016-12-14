@@ -1,5 +1,5 @@
 """Program for beacon RPi."""
-
+from __future__ import print
 from multiprocessing import Process, Queue
 from Queue import Empty
 import subprocess
@@ -14,7 +14,7 @@ import picamera
 import serial
 import sys.stderr
 
-DEBUG = False
+DEBUG = True
 CELL = False  # Debugging other functions goes faster w/o cellular
 SCAN_BLUETOOTH = False # Whether we scan bluetooth for device addresses
 TAKE_PICS = True # Whether we take pictures when loop state is on
