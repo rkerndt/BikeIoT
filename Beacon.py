@@ -280,12 +280,13 @@ def main():
                 data = get_queue_data()
                 
             if DEBUG:
-                # Print sensor data
-                print('\n** Sensor data **')
-                print('\tLoudness: ' + str(data[1]))
-                print('\tTemperature: ' + str(data[2]))
-                print('\tHumidity: ' + str(data[3]))
-                print('\t*****************\n')
+              pass
+                # TODO: Broken Print sensor data
+                #print('\n** Sensor data **')
+                #print('\tLoudness: ' + str(data[1]))
+                #print('\tTemperature: ' + str(data[2]))
+                #print('\tHumidity: ' + str(data[3]))
+                #print('\t*****************\n')
 
             # Take picture only when loop detected at CAM_PERIOD interval
             if TAKE_PICS and data[0] and (time.time() - cam_time > CAM_PERIOD):
