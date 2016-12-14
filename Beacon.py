@@ -21,7 +21,7 @@ LOOP_ON = '01'
 LOOP_OFF = '00'
 MIN_DISK_SPACE = 95
 IMG_PATH = '/home/pi/Images/'
-HCI_DEVICE = hci0
+HCI_DEVICE = 'hci0'
 
 BROADCAST_PERIOD = 60*60  # At least ~540 to use 1 mb per month
 if DEBUG:
