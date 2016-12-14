@@ -114,7 +114,7 @@ def bt_process():
                 grovepi.digitalWrite(LED, data[0])
     except IOError:
         if DEBUG:
-            print('IOError detected and excepted: %s' % str(IOError),file=OUT_FILE)
+            print('IOError detected and excepted: %s' % (str(IOError),),file=OUT_FILE)
         pass
     except:
       message = "Unexpected error: %s" % sys.exc_into()[0]
