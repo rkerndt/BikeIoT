@@ -83,7 +83,7 @@ def init_ble():
     # always send a reset first, at times hci0 doesn't show up until after
     # after the reset
     error_msg = "OK"
-    rslt = subprocess.call('sudo hcitool hci0 reset', shell=True)
+    rslt = subprocess.call('sudo hciconfig hci0 reset', shell=True)
     if rslt !=0:
       error_msg = "hci reset failed with %d" % rslt
       raise Beacon_Error(error_msg)
