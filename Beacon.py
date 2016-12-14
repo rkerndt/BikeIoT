@@ -99,6 +99,8 @@ def init_ble():
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
 
+    init_ble()
+    
     # only do something when loop state has changed
     previous = None
     try:
@@ -109,12 +111,13 @@ def bt_process():
                 previous = data[0]
                 broadcast(data[0])
                 grovepi.digitalWrite(LED, data[0])
-    except IOError as e:
-        if DEBUG:
-            print('IOError detected and excepted: %s' % (str(e),))
-    except:
-      message = "Unexpected error: %s" % sys.exc_into()[0]
-      raise Beacon_Error(message)
+            except IOError as e:
+                if DEBUG:
+                print('IOError detected and excepted: %s' % (str(e),))
+
+            except:
+                message = "Unexpected error: %s" % sys.exc_into()[0]
+                raise Beacon_Error(message)
 
 
 def broadcast(loopstate):
@@ -148,6 +151,7 @@ def cleanup():
     """Clean up at program end."""
     if broadcast_proc:
         broadcast_proc.terminate()
+        broadcast_proc.join()
     subprocess.call('sudo hciconfig hci0 noleadv', shell=True)
     subprocess.call('sudo hciconfig hci0 reset', shell=True)
     subprocess.call('sudo hciconfig hci0 down', shell=True)
@@ -253,9 +257,6 @@ def main():
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
  
-    # Initialize ble
-    init_ble()
-
     # Setup code for before running loop
     broadcast_proc = Process(target=bt_process)
 
