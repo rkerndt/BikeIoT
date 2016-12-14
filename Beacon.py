@@ -40,7 +40,6 @@ cam_time = time.time()
 TEMP_HUM_SENSOR = 6  # Connect to D6
 LOOP = 5  # Connect to D5
 LED = 3  # Connect to D3
-grovepi.pinMode(LOUDNESS_SENSOR, 'INPUT')
 grovepi.pinMode(TEMP_HUM_SENSOR, 'INPUT')
 grovepi.pinMode(LOOP, 'INPUT')
 grovepi.pinMode(TEMP_HUM_SENSOR, 'OUTPUT')
