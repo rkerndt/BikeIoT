@@ -76,6 +76,7 @@ broadcast_proc = None
 def sig_handler(signum, frame):
   # call cleanup on signal
   cleanup()
+  sys.exit(0)
 
 def init_ble():
     # always send a reset first, at times hci0 doesn't show up until after
