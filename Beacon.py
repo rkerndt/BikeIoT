@@ -322,7 +322,7 @@ def main():
                 #print('\t*****************\n')
 
             # Take picture only when loop detected at CAM_PERIOD interval
-            if TAKE_PICS and data[0] and (time.time() - cam_time > CAM_PERIOD):
+            if TAKE_PICS and (data[0] == 1) and (time.time() - cam_time > CAM_PERIOD):
                 cam_time = time.time()
                 if DEBUG:
                         print('Space left: %d%%' % get_space())
