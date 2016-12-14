@@ -37,7 +37,6 @@ broadcast_time -= BROADCAST_PERIOD  # Makes particle broadcast immediately
 cam_time = time.time()
 
 # Set up grovepi
-LOUDNESS_SENSOR = 0  # Connect to A0
 TEMP_HUM_SENSOR = 6  # Connect to D6
 LOOP = 5  # Connect to D5
 LED = 3  # Connect to D3
@@ -104,7 +103,15 @@ def bt_process():
     # only do something when loop state has changed
     previous = None
     while(True):
-        data = get_data()
+        try:
+            data = get_data()
+        except IOError as e:
+            if DEBUG:
+                print('IOError occured during get_data() %s' % str(e))
+        except:
+            message = "unexpected error (get_data): %s" % sys.exc_into()[0]
+            raise Beacon_Error(message)
+            
         set_queue_data(data)
         if previous != data[0]:
             previous = data[0]
@@ -173,10 +180,12 @@ def get_data():
 
     Don't call in more than one thread.
     """
+    loopstate = None
+    temp = None
+    hum = None
     loopstate = get_loopstate()
-    loudness = grovepi.analogRead(LOUDNESS_SENSOR)
-    [temp, hum] = grovepi.dht(TEMP_HUM_SENSOR, module_type=0)
-    return [loopstate, loudness, temp, hum]
+    temp, hum = grovepi.dht(TEMP_HUM_SENSOR, module_type=0)
+    return [loopstate, temp, hum]
 
 
 def get_space():
@@ -290,9 +299,8 @@ def main():
               pass
                 # TODO: Broken Print sensor data
                 #print('\n** Sensor data **')
-                #print('\tLoudness: ' + str(data[1]))
-                #print('\tTemperature: ' + str(data[2]))
-                #print('\tHumidity: ' + str(data[3]))
+                #print('\tTemperature: ' + str(data[1]))
+                #print('\tHumidity: ' + str(data[2]))
                 #print('\t*****************\n')
 
             # Take picture only when loop detected at CAM_PERIOD interval
