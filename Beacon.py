@@ -92,8 +92,13 @@ def init_ble():
       rslt = subprocess.call('sudo hciconfig hci0 up', shell=True)
     if rslt != 0:
       error_msg = "hci up failed with %d" % rslt
+    else:
+      rslt = subprocess.call('sudo hciconfig hci0 noscan', shell=True)
+    if rslt != 0:
+      error_msg = "hci noscan failed with %d" % rslt
+    if rslt != 0:
+      raise Beacon_Error(error_msg)
 
-    subprocess.call('sudo hciconfig hci0 up', shell=True)
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
 
@@ -109,8 +114,11 @@ def bt_process():
                 grovepi.digitalWrite(LED, data[0])
     except IOError:
         if DEBUG:
-            print('IOError detected and excepted',file=OUT_FILE)
+            print('IOError detected and excepted: %s', str(IOError),file=OUT_FILE)
         pass
+    except:
+      message = "Unexpected error: %s" % sys.exc_into()[0]
+      raise Beacon_Error(message)
 
 
 def broadcast(loopstate):
@@ -239,6 +247,19 @@ def main():
     # handle sigterm and sigint to exit gracefully
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
+
+class Beacon_Error(Exception):
+  """
+  A class for all that can go wrong with BLE beacons
+  """
+    def __init__(self, message):
+      self.string = message
+
+    def __str__(self):
+      return self.string
+
+    def __repr__(self):
+      return("Beacon_Error('%s')", self.string)
 
     # Main loop
     while(True):
