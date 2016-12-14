@@ -260,7 +260,7 @@ def set_queue_data(data):
         grove_queue.put(data)
     except Full as e:
         if DEBUG:
-            print('Dropped data %s due to queue full (%d entries)' % (str(data), len(grove_queue))
+            print('Dropped data %s due to queue full (%d entries)' % (str(data), len(grove_queue)))
 
 def take_img(folder_path):
     """Take picture."""
