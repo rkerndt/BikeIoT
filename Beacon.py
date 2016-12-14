@@ -12,16 +12,18 @@ from bluepy import btle
 import grovepi
 import picamera
 import serial
+import sys.stderr
 
 DEBUG = False
 CELL = False  # Debugging other functions goes faster w/o cellular
 SCAN_BLUETOOTH = False # Whether we scan bluetooth for device addresses
 TAKE_PICS = True # Whether we take pictures when loop state is on
-
 LOOP_ON = '01'
 LOOP_OFF = '00'
 MIN_DISK_SPACE = 95
 IMG_PATH = '/home/pi/Images/'
+HCI_DEVICE = hci0
+OUT_FILE = stderr
 
 BROADCAST_PERIOD = 60*60  # At least ~540 to use 1 mb per month
 if DEBUG:
@@ -78,7 +80,20 @@ broadcast_proc = None
 def sig_handler(signum, frame):
   # call cleanup on signal
   cleanup()
-  
+
+def init_ble():
+    # always send a reset first, at times hci0 doesn't show up until after
+    # after the reset
+    error_msg = "OK"
+    rslt = subprocess.call('sudo hcitool hci0 reset', shell=True)
+    if rslt !=0:
+      error_msg = "hci reset failed with %d" % rslt
+    else:
+      rslt = subprocess.call('sudo hciconfig hci0 up', shell=True)
+    if rslt != 0:
+      error_msg = "hci up failed with %d" % rslt
+
+    subprocess.call('sudo hciconfig hci0 up', shell=True)
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
 
@@ -94,7 +109,7 @@ def bt_process():
                 grovepi.digitalWrite(LED, data[0])
     except IOError:
         if DEBUG:
-            print 'IOError detected and excepted'
+            print('IOError detected and excepted',file=OUT_FILE)
         pass
 
 
@@ -193,7 +208,7 @@ def ser_command(str, ser, responses=['OK\r\n']):
             msg = ser.readline()
         except OSError, serial.SerialException:
             if DEBUG:
-                print 'Unable to read. Is something else using the port?'
+                print('Unable to read. Is something else using the port?',file=OUT_FILE)
     return msg
 
 
@@ -231,7 +246,7 @@ def main():
             # Start bluetooth broadcast in parallel
             if not broadcast_proc.is_alive():
                 if DEBUG:
-                    print 'Starting new bluetooth process'
+                    print('Starting new bluetooth process',file=OUT_FILE)
                 del(broadcast_proc)
                 broadcast_proc = Process(target=bt_process)
                 broadcast_proc.start()
@@ -243,23 +258,23 @@ def main():
                 
             if DEBUG:
                 # Print sensor data
-                print '\n** Sensor data **'
-                print 'Loudness: ' + str(data[1])
-                print 'Temperature: ' + str(data[2])
-                print 'Humidity: ' + str(data[3])
-                print '*****************\n'
+                print('\n** Sensor data **',file=OUT_FILE)
+                print('\tLoudness: ' + str(data[1]),file=OUT_FILE)
+                print('\tTemperature: ' + str(data[2]),file=OUT_FILE)
+                print(\t'Humidity: ' + str(data[3]),file=OUT_FILE)
+                print(\t'*****************\n',file=OUT_FILE)
 
             # Take picture only when loop detected at CAM_PERIOD interval
             if TAKE_PICS and data[0] and (time.time() - cam_time > CAM_PERIOD):
                 cam_time = time.time()
                 if DEBUG:
-                        print 'Space left: %d%%' % get_space()
+                        print('Space left: %d%%' % get_space(),file=OUT_FILE)
                 if get_space() < MIN_DISK_SPACE:
                     take_img(IMG_PATH)
                 # Get number of images taken
                 pics = len(os.listdir(IMG_PATH))
                 if DEBUG:
-                  print 'Pics: %d' % pics
+                  print('Pics: %d' % pics,file=OUT_FILE)
 
             if SCAN_BLUETOOTH:
                 # Check for new devices
@@ -272,8 +287,8 @@ def main():
                         devices.append(s_dev)
                 if DEBUG:
                     # Print device count
-                    print 'Devices found since ',
-                    print broadcast_time
+                    print('Devices found since ',file=OUT_FILE,end="")
+                    print(broadcast_time,file=OUT_FILE)
 
                 broadcast_data = data[1:4]
                 broadcast_data.insert(0, len(devices))
@@ -290,9 +305,9 @@ def main():
                             cell_msg += '"' + prefixes[i] + '":' + str(d) + ','
                         cell_msg = cell_msg[:len(cell_msg) - 1] + '}'
                         if DEBUG:
-                            print 'Old data: %s' % old_broadcast_data
-                            print 'New data: %s' % broadcast_data
-                            print 'Cell message: ' + cell_msg + '\n'
+                            print('Old data: %s' % old_broadcast_data,file=OUT_FILE)
+                            print('New data: %s' % broadcast_data,file=OUT_FILE)
+                            print('Cell message: ' + cell_msg + '\n',file=OUT_FILE)
                         # Send broadcast
                         ser_command(cell_msg, cell_ser)
                         broadcast_time = time.time()
@@ -301,7 +316,7 @@ def main():
                 old_broadcast_data = broadcast_data
 
                 if DEBUG:
-                    print 'Cycled'
+                    print('Cycled',file=OUT_FILE)
         except:
             cleanup()
             raise
