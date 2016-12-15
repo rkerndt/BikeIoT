@@ -75,12 +75,15 @@ if TAKE_PICS:
 broadcast_proc = None
 
 def sig_handler(signum, frame):
-  # call cleanup on signal only if we are the parent (Beacon) process
-  if DEBUG:
-      print('%s received signal (%d)' % (I_AM, signum))
-  if I_AM == 'Beacon':
-      cleanup()
-  sys.exit(0)
+    global I_AM
+    # call cleanup on signal only if we are the parent (Beacon) process
+    if DEBUG:
+        print('%s received signal (%d)' % (I_AM, signum))
+    if I_AM == 'Beacon':
+        cleanup()
+        sys.exit(0)
+    else:
+      I_AM = 'Terminate'
 
 def init_ble():
     # always send a reset first, at times hci0 doesn't show up until after
@@ -111,7 +114,7 @@ def bt_process():
     current_loop_state = LOOP_OFF
     I_AM = 'child'
 
-    while(True):
+    while(I_AM != 'Terminate'):
         try:
             data = get_data()
         except IOError as e:
