@@ -23,6 +23,7 @@ MIN_LOOP_ON_COUNT = 1
 MIN_DISK_SPACE = 95
 IMG_PATH = '/home/pi/Images/'
 HCI_DEVICE = 'hci0'
+I_AM = 'Beacon'
 
 BROADCAST_PERIOD = 60*60  # At least ~540 to use 1 mb per month
 if DEBUG:
@@ -74,9 +75,10 @@ if TAKE_PICS:
 broadcast_proc = None
 
 def sig_handler(signum, frame):
-  # call cleanup on signal
-  cleanup()
-  sys.exit(0)
+  # call cleanup on signal only if we are the parent (Beacon) process
+  if I_AM == 'Beacon':
+      cleanup()
+      sys.exit(0)
 
 def init_ble():
     # always send a reset first, at times hci0 doesn't show up until after
@@ -97,7 +99,7 @@ def init_ble():
 
 def bt_process():
     """Define bluetooth function that will be run as separate process."""
-
+    global I_AM
     init_ble()
     
     # only do something when loop state has changed and have confidence in
@@ -105,7 +107,8 @@ def bt_process():
     loop_on_count = 0
     previous_loop_state = None
     current_loop_state = LOOP_OFF
-    
+    I_AM = 'child'
+
     while(True):
         try:
             data = get_data()
@@ -180,6 +183,7 @@ def broadcast(loopstate):
 def cleanup():
     global broadcast_proc
     """Clean up at program end."""
+
     if broadcast_proc:
         broadcast_proc.terminate()
         broadcast_proc.join()
