@@ -76,6 +76,8 @@ broadcast_proc = None
 
 def sig_handler(signum, frame):
   # call cleanup on signal only if we are the parent (Beacon) process
+  if DEBUG:
+      print('%s received signal (%d)' % (I_AM, signum))
   if I_AM == 'Beacon':
       cleanup()
       sys.exit(0)
