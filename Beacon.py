@@ -80,7 +80,7 @@ def sig_handler(signum, frame):
       print('%s received signal (%d)' % (I_AM, signum))
   if I_AM == 'Beacon':
       cleanup()
-      sys.exit(0)
+  sys.exit(0)
 
 def init_ble():
     # always send a reset first, at times hci0 doesn't show up until after
