@@ -171,14 +171,14 @@ def broadcast(loopstate):
     cmdstring += '0D '  # Length of entire following data, in bytes
     cmdstring += '02 '  # Length of flag info
     cmdstring += '01 '  # Use AD flags
-    cmdstring += '02 '  # Flag value:
+    cmdstring += '1A '  # Flag value:
     # bit 0 (OFF) LE Limited Discoverable Mode
     # bit 1 (ON) LE General Discoverable Mode
     # bit 2 (OFF) BR/EDR Not Supported
     # bit 3 (ON) Simultaneous LE and BR/EDR to Same Device Capable (controller)
     # bit 4 (ON) Simultaneous LE and BR/EDR to Same Device Capable (Host)
     cmdstring += '09 '  # Length of following message, in bytes
-    cmdstring += '07 '  # GAP value (07 = 128 Bit Complete Service UUID List)
+    cmdstring += 'FF '  # GAP value (07 = 128 Bit Complete Service UUID List)
     cmdstring += '42 69 63 79 63 6c 65 '  # Header to identify beacon message-
     # - and it's also is Bicycle in ASCII!
     if loopstate:
