@@ -97,9 +97,13 @@ def init_ble():
     if rslt != 0:
       error_msg = "hci up failed with %d" % rslt
       raise Beacon_Error(error_msg)
-    rslt = subprocess.call('sudo hciconfig hci0 noscanc', shell=True)
+    rslt = subprocess.call('sudo hciconfig hci0 leadv 3', shell=True)
     if rslt != 0:
-      error_msg = "hci noscanc failed with %d" % rslt
+      error_msg = "hci0 leadv3 failed with %d" % rslt
+      raise Beacon_Error(error_msg)
+    rslt = subprocess.call('sudo hciconfig hci0 noscan', shell=True)
+    if rslt != 0:
+      error_msg = "hci noscan failed with %d" % rslt
       raise Beacon_Error(error_msg)
 
 def bt_process():
@@ -182,8 +186,6 @@ def broadcast(loopstate):
     else:
         cmdstring = cmdstring + LOOP_OFF + ' &>/dev/null'
     subprocess.call(cmdstring, shell=True)
-    subprocess.call('sudo hciconfig hci0 leadv 3 &>/dev/null', shell=True)
-
 
 def cleanup():
     global broadcast_proc
