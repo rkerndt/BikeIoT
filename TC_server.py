@@ -4,7 +4,7 @@ Classes and methods for receiving traffic controller phase requests.
 """
 
 import paho.mqtt.client as mqtt
-import grovepi
+#import grovepi
 import struct
 from datetime import datetime
 import sys
@@ -55,7 +55,7 @@ class TC:
     _phase_dwell = 0.1
 
     # general payload formats
-    _payload_type_format = '!I'
+    _payload_type_format = '!i'
     _payload_type_length = struct.calcsize(_payload_type_format)
 
     def __init__(self):
@@ -103,7 +103,8 @@ class TC:
         if len(payload) < TC._payload_type_length:
             msg = 'improperly formated TC payload'
             raise TC_Exception(msg)
-        return struct.unpack_from(TC._payload_type_format, payload, 0)
+        (request_type,) = struct.unpack_from(TC._payload_type_format, payload, 0)
+        return request_type
 
     """
     The following static methods are signatures for the various mqtt callback functions.
@@ -232,19 +233,58 @@ class TC:
         """
         pass
 
-class TC_Will():
+class TC_Type:
     """
-    Structure for TC will payload. Sent by broker when a client has 'died'.
+    Base TC class which holds only the type value
     """
-    _struct_format = '!I%ds' % (TC.MAX_ID_BYTES,)
+    _struct_format = '!i'
     _struct_size = struct.calcsize(_struct_format)
 
-    def __init__(self, id:str):
+    def __init__(self, type):
+        """
+        No reason to create this base type, use decode() to obtain type value from a derived class. But, this
+        would be better done using get_type() method in class TC.
+        """
+        self.type = type
+
+    def encode(self):
+        """
+        Converts type into a bytes object represent the c structure:
+        struct TC_Type {
+            int type;
+        } __attribute__((PACKED));
+        :return: bytearray
+        """
+        packed = struct.pack(TC_Type._struct_format, self.type)
+        return bytearray(packed)
+
+    @classmethod
+    def decode(cls, payload:bytes):
+        """
+        Creates a TC_Type object from bytes object which should have been packed using encode() method
+        from TC_Type derived object.
+        :return: TC_Type
+        """
+        if len(payload) < TC_Type._struct_size:
+            msg = 'improperly formatted TC Type (derived) payload'
+            raise TC_Exception(msg)
+        (type,) = struct.unpack_from(TC_Type._struct_format, payload, 0)
+        return TC_Type(type)
+
+class TC_Identifier(TC_Type):
+    """
+    Structure for TC identifier payload. Includes just the type and sender fields. This class is used for the
+    will payload (with type set to TC.Will. All other payload types are derived from this class
+    """
+    _struct_format = '!i%ds' % (TC.MAX_ID_BYTES,)
+    _struct_size = struct.calcsize(_struct_format)
+
+    def __init__(self, type:int, id:str):
         """
 
         :param id: str
         """
-        self.type = TC.WILL
+        super().__init__(type)
         self.id = id
 
     def encode(self):
@@ -260,7 +300,7 @@ class TC_Will():
         if len(id_bytes) > TC.MAX_ID_BYTES:
             msg = "user id<%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        packed = struct.pack(TC_Will._struct_format, self.type, id_bytes)
+        packed = struct.pack(TC_Identifier._struct_format, self.type, id_bytes)
         return bytearray(packed)
 
     @classmethod
@@ -269,20 +309,20 @@ class TC_Will():
         Creates a TC_Will object from bytes object which should have been packed using TC_Will.encode()
         :return: TC_Will object
         """
-        if len(payload) != TC_Will._struct_size:
+        if len(payload) < TC_Identifier._struct_size:
             msg = 'improperly formatted TC Will payload'
             raise TC_Exception(msg)
-        type, id_bytes = struct.unpack(TC_Will._struct_format, payload)
+        type, id_bytes = struct.unpack_from(TC_Identifier._struct_format, payload, 0)
         id = id_bytes.decode()
-        return TC_Will(id)
+        return TC_Identifier(type, id)
 
 
-class TC_Request():
+class TC_Request(TC_Identifier):
     """
     Structure and methods for manipulating mqtt payloads used in traffic control requests
     """
 
-    _struct_format = '!I%ds%dsII' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
+    _struct_format = '!i%ds%dsii' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
     _struct_size = struct.calcsize(_struct_format)
 
     def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time:int=0):
@@ -293,8 +333,7 @@ class TC_Request():
         :param phase: int
         :param arrival_time: int (Seconds until arrival)
         """
-        self.type = TC.PHASE_REQUEST
-        self.user_id = user_id
+        super().__init__(TC.PHASE_REQUEST, user_id)
         self.controller_id = controller_id
         self.phase = phase
         self.arrival_time = arrival_time
@@ -314,10 +353,10 @@ class TC_Request():
 
         :return: bytearray
         """
-        user_id_bytes = self.user_id.encode('utf-8')
+        user_id_bytes = self.id.encode('utf-8')
         controller_id_bytes = self.controller_id.encode('utf-8')
         if len(user_id_bytes) > TC.MAX_ID_BYTES:
-            msg = "user id <%s> exceeds %d utf-8 bytes" % (self.user_id, TC.MAX_ID_BYTES)
+            msg = "user id <%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
         if len(controller_id_bytes) > TC.MAX_ID_BYTES:
             msg = "controller id <%s> exceeds %d utf-8 bytes" % (self.controller_id, TC.MAX_ID_BYTES)
@@ -377,7 +416,7 @@ class Server (TC):
         self.mqttc.user_data_set(self)
 
         # defined required topic callbacks
-        self.mqttc.will_set(TC._will_topic, TC_Will(self.id).encode())
+        self.mqttc.will_set(TC._will_topic, TC_Identifier(TC.WILL, self.id).encode())
         self.mqttc.on_connect = TC.on_connect
         self.mqttc.on_subscribe = TC.on_subscribe
         self.mqttc.on_message = TC.on_message
@@ -419,12 +458,12 @@ class Server (TC):
         """
 
         if request.phase in self.phases:
-            msg = "received request from phase %d from %s" % (request.phase, request.user_id)
+            msg = "processing request for phase %d from %s in %d seconds" % (request.phase, request.id, request.arrival_time)
             self.output_log(msg)
             self.lock.acquire()
-            grovepi.digital_write(self.phase_to_gpio[request.phase], 1)
+            #grovepi.digitalWrite(self.phase_to_gpio[request.phase], 1)
             sleep(TC._phase_dwell)
-            grovepi.digital_write(self.phase_to_gpio[request.phase], 0)
+            #grovepi.digitalWrite(self.phase_to_gpio[request.phase], 0)
             self.lock.release()
 
         else:
@@ -441,12 +480,18 @@ class Server (TC):
         :return: None
         """
 
+        msg = "received message id %s on topic %s" % (mqtt_msg.mid, mqtt_msg.topic)
+        userdata.output_log(msg)
+
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
-            type = Server.get_type(mqtt_msg.payload)
-            if type == TC.PHASE_REQUEST:
+            request_type = Server.get_type(mqtt_msg.payload)
+            if request_type == TC.PHASE_REQUEST:
                 request = TC_Request.decode(mqtt_msg.payload)
                 userdata.request_phase(request)
+            else:
+                msg = "received payload of type %d but expecting %d" % (request_type, TC.PHASE_REQUEST)
+                userdata.output_error(msg)
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
@@ -482,7 +527,7 @@ class User(TC):
         self.mqttc.user_data_set(self)
 
         # defined required topic callbacks
-        self.mqttc.will_set(TC._will_topic, TC_Will(self.id).encode())
+        self.mqttc.will_set(TC._will_topic, TC_Identifier(TC.WILL, self.id).encode())
         self.mqttc.on_connect = TC.on_connect
         self.mqttc.on_subscribe = TC.on_subscribe
         self.mqttc.on_message = TC.on_message
@@ -497,8 +542,11 @@ class User(TC):
         """
         self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
 
+        # subscribe to will topic to get messages intended for me
+        self.mqttc.subscribe(TC._will_topic, TC._qos)
 
-        # enter network loop forever, relying on interrupt handler to stop things
+
+        # start network loop
         msg = "starting TC User with id %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.loop_start()
@@ -521,6 +569,8 @@ class User(TC):
         """
         request = TC_Request(self.id, controller_id, phase, arrival_time)
         topic = TC._tc_topic_format % controller_id
+        msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, arrival_time)
+        self.output_log(msg)
         self.mqttc.publish(topic, request.encode())
 
 def main(argv):
