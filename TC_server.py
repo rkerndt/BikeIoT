@@ -86,9 +86,9 @@ class TC_Request():
         :param arrival_time: int (Seconds until arrival)
         """
         self.type = TC.PHASE_REQUEST
-        self.user_id = None
-        self.controller_id = None
-        self.phase = None
+        self.user_id = user_id
+        self.controller_id = controller_id
+        self.phase = phase
         self.arrival_time = arrival_time
 
     def encode(self):
@@ -155,7 +155,7 @@ class TC:
     _qos = 2
     _topic_base = 'tc/'
     _will_topic =  _topic_base + 'will/'
-    _tc_topic_format = 'tc_%s/'
+    _tc_topic_format = _topic_base + '%s/'
     _broker_url = 'julie.eug.kerndt.com'
     _broker_port = 1883
     _broker_keepalive = 60
@@ -321,7 +321,7 @@ class Server (TC):
     TODO: add locking so only one request is processed at a time, how to deal with heavy load
     """
 
-    def __init__(self, controller_id: str, map=TC._default_phase_map):
+    def __init__(self, controller_id:str, map=TC._default_phase_map):
         """
         Instantiates traffic controller server
         :param controller_id: str
@@ -409,7 +409,7 @@ class Server (TC):
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
-    def _signal_handler(self, signum, frame):
+    def signal_handler(self, signum, frame):
         """
         Shuts down server on SIGINT and SIGTERM
         :param signum:
@@ -427,8 +427,54 @@ class User(TC):
     def __init__(self, user_id:str):
         """
 
-        :param user_id:
+        :param user_id:str
+        :param map: list [(int,int)] or dict {int:int} mapping of phase number to gpio pin (using grovepi pin numbers)
         """
+        super().__init__()
+        self.id = user_id
+        self.mqttc = mqtt.Client(user_id)
+
+        # using password until we can get TLS setup with user certificates
+        self.mqttc.username_pw_set(self.id)
+
+        # pass reference to self for use in callbacks
+        self.mqttc.user_data_set(self)
+
+        # defined required topic callbacks
+        self.mqttc.will_set(TC._will_topic, TC_Will(self.id))
+
+    def start(self):
+        """
+        Connects to broker and enters loop_forever. Use stop() call to terminate connection to broker and
+        terminate loop.
+        :return: None
+        """
+        self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
+
+
+        # enter network loop forever, relying on interrupt handler to stop things
+        msg = "starting TC Server for controller %s" % (self.id,)
+        self.output_log(msg)
+        self.mqttc.loop_forever()
+
+    def stop(self):
+        """
+        Disconnects from broker which will also cause loop_forever to exit in start method.
+        :return: None
+        """
+        self.mqttc.disconnect()
+
+    def send_phase_request(self, controller_id:str, phase:int, arrival_time:int=0):
+        """
+        Creates a TC_Request object and publishes on the appropriate topic
+        :param controller_id: str
+        :param phase: int
+        :param arrival_time: int
+        :return: None
+        """
+        request = TC_Request(self.id, controller_id, phase, arrival_time)
+        topic = TC._tc_topic_format % controller_id
+        self.mqttc.publish(topic, request.encode())
 
 def main(argv):
     """
@@ -445,8 +491,8 @@ def main(argv):
 
     myTC = Server(argv[1])
 
-    signal.signal(signal.SIGTERM, myTC._signal_handler)
-    signal.signal(signal.SIGINT, myTC._signal_handler)
+    signal.signal(signal.SIGTERM, myTC.signal_handler)
+    signal.signal(signal.SIGINT, myTC.signal_handler)
 
     myTC.run()
     sys.exit(0)
