@@ -174,7 +174,7 @@ class TC:
         :param mqtt_msg: MQTTMessage
         :return: None
         """
-        msg = "received message id %d" % (mqtt_msg.mid)
+        msg = "received message id %d" % (mqtt_msg.mid,)
         userdata.output_log(msg)
 
     @staticmethod
