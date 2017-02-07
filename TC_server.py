@@ -4,7 +4,7 @@ Classes and methods for receiving traffic controller phase requests.
 """
 
 import paho.mqtt.client as mqtt
-#import grovepi
+import grovepi
 import struct
 from datetime import datetime
 import sys
@@ -306,8 +306,9 @@ class TC_Identifier(TC_Type):
     @classmethod
     def decode(cls, payload:bytes):
         """
-        Creates a TC_Will object from bytes object which should have been packed using TC_Will.encode()
-        :return: TC_Will object
+        Creates a TC_Identifier object from bytes object which should have been packed using TC_Identifier.encode()
+        or encoded for a derived class.
+        :return: TC_Identifier object
         """
         if len(payload) < TC_Identifier._struct_size:
             msg = 'improperly formatted TC Will payload'
@@ -461,9 +462,9 @@ class Server (TC):
             msg = "processing request for phase %d from %s in %d seconds" % (request.phase, request.id, request.arrival_time)
             self.output_log(msg)
             self.lock.acquire()
-            #grovepi.digitalWrite(self.phase_to_gpio[request.phase], 1)
+            grovepi.digitalWrite(self.phase_to_gpio[request.phase], 1)
             sleep(TC._phase_dwell)
-            #grovepi.digitalWrite(self.phase_to_gpio[request.phase], 0)
+            grovepi.digitalWrite(self.phase_to_gpio[request.phase], 0)
             self.lock.release()
 
         else:

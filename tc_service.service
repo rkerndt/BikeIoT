@@ -1,0 +1,14 @@
+# Rickie Kerndt <rkerndt@cs.uoregon.edu>
+# systemd service file to start, status and shutdown the Traffic Controller SErver
+# This file should be located under directory /etc/systemd/system
+
+[Unit]
+    Description=Traffic Controller BikeIoT
+
+[Service]
+    Type=idle
+    KillMode=process
+    ExecStart=/usr/bin/python3 /home/pi/lib/python/TC_server.py beacon_1.cs.uoregon.edu
+
+[Install]
+    WantedBy=multi-user.target
