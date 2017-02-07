@@ -203,8 +203,7 @@ class TC_Will():
     """
     Structure for TC will payload. Sent by broker when a client has 'died'.
     """
-    _struct_format = '!I!%ds' % (TC.MAX_ID_BYTES,)
-    print("_struct_format=<%s>" % _struct_format)
+    _struct_format = '!I%ds' % (TC.MAX_ID_BYTES,)
     _struct_size = struct.calcsize(_struct_format)
 
     def __init__(self, id:str):
@@ -222,13 +221,14 @@ class TC_Will():
             int type;
             char id[TC.MAX_ID_BYTES];
         }  __attribute__((PACKED));
-        :return: bytes
+        :return: bytearray
         """
         id_bytes = self.id.encode('utf-8')
         if len(id_bytes) > TC.MAX_ID_BYTES:
             msg = "user id<%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        return struct.pack(TC_Will._struct_format, self.type, id_bytes)
+        packed = struct.pack(TC_Will._struct_format, self.type, id_bytes)
+        return bytearray(packed)
 
     @classmethod
     def decode(cls, payload:bytes):
@@ -249,7 +249,7 @@ class TC_Request():
     Structure and methods for manipulating mqtt payloads used in traffic control requests
     """
 
-    _struct_format = '!I!%ds!%ds!I!I' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
+    _struct_format = '!I%ds%dsII' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
     _struct_size = struct.calcsize(_struct_format)
 
     def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time:int=0):
@@ -279,7 +279,7 @@ class TC_Request():
             int arrival_time;
             } __attribute__((PACKED));
 
-        :return: bytes
+        :return: bytearray
         """
         user_id_bytes = self.user_id.encode('utf-8')
         controller_id_bytes = self.controller_id.encode('utf-8')
@@ -289,8 +289,9 @@ class TC_Request():
         if len(controller_id_bytes) > TC.MAX_ID_BYTES:
             msg = "controller id <%s> exceeds %d utf-8 bytes" % (self.controller_id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        return struct.pack(TC_Request._struct_format, self.type, user_id_bytes, controller_id_bytes,
-                           self.phase,self.arrival_time)
+        packed = struct.pack(TC_Request._struct_format, self.type, user_id_bytes, controller_id_bytes,
+                             self.phase,self.arrival_time)
+        return bytearray(packed)
 
 
     @classmethod
@@ -343,7 +344,7 @@ class Server (TC):
         self.mqttc.user_data_set(self)
 
         # defined required topic callbacks
-        self.mqttc.will_set(TC._will_topic, TC_Will(self.id))
+        self.mqttc.will_set(TC._will_topic, TC_Will(self.id).encode())
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
         self.mqttc.message_callback_add(self.tc_topic, Server.on_topic)
 
@@ -371,6 +372,7 @@ class Server (TC):
         :return: None
         """
         msg = "stopping TC Server for controller %s" % (self.id,)
+        self.output_log(msg)
         self.mqttc.disconnect()
 
     def request_phase(self, request:TC_Request):
@@ -444,7 +446,7 @@ class User(TC):
         self.mqttc.user_data_set(self)
 
         # defined required topic callbacks
-        self.mqttc.will_set(TC._will_topic, TC_Will(self.id))
+        self.mqttc.will_set(TC._will_topic, TC_Will(self.id).encode())
 
     def start(self):
         """
@@ -458,13 +460,14 @@ class User(TC):
         # enter network loop forever, relying on interrupt handler to stop things
         msg = "starting TC Server for controller %s" % (self.id,)
         self.output_log(msg)
-        self.mqttc.loop_forever()
+        self.mqttc.loop_start()
 
     def stop(self):
         """
         Disconnects from broker which will also cause loop_forever to exit in start method.
         :return: None
         """
+        self.mqttc.loop_stop()
         self.mqttc.disconnect()
 
     def send_phase_request(self, controller_id:str, phase:int, arrival_time:int=0):
