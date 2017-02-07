@@ -364,7 +364,7 @@ class Server (TC):
         """
         super().__init__()
         self.id = controller_id
-        self.tc_topic = Server._tc_topic_format % (self.id,)
+        self.tc_topic = TC._tc_topic_format % (self.id,)
         self.phase_to_gpio = dict(map)
         self.phases = frozenset(self.phase_to_gpio.keys())
 
