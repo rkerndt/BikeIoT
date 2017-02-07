@@ -25,122 +25,6 @@ class TC_Exception (Exception):
     def __repr__(self):
         return "TC_Exception(\"%s\")" % (self.msg,)
 
-class TC_Will():
-    """
-    Structure for TC will payload. Sent by broker when a client has 'died'.
-    """
-    _struct_format = '!I!%ds' % (TC.MAX_ID_BYTES,)
-    _struct_size = struct.calcsize(_struct_format)
-
-    def __init__(self, id:str):
-        """
-
-        :param id: str
-        """
-        self.type = TC.WILL
-        self.id = id
-
-    def encode(self):
-        """
-        Converts will into a bytes object represent the c structure:
-        struct TC_Will {
-            int type;
-            char id[TC.MAX_ID_BYTES];
-        }  __attribute__((PACKED));
-        :return: bytes
-        """
-        id_bytes = self.id.encode('utf-8')
-        if len(id_bytes) > TC.MAX_ID_BYTES:
-            msg = "user id<%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
-            raise TC_Exception(msg)
-        return struct.pack(TC_Will._struct_format, self.type, id_bytes)
-
-    @classmethod
-    def decode(cls, payload:bytes):
-        """
-        Creates a TC_Will object from bytes object which should have been packed using TC_Will.encode()
-        :return: TC_Will object
-        """
-        if len(payload) != TC_Will._struct_size:
-            msg = 'improperly formatted TC Will payload'
-            raise TC_Exception(msg)
-        type, id_bytes = struct.unpack(TC_Will._struct_format, payload)
-        id = id_bytes.decode()
-        return TC_Will(id)
-
-
-class TC_Request():
-    """
-    Structure and methods for manipulating mqtt payloads used in traffic control requests
-    """
-
-    _struct_format = '!I!%ds!%ds!I!I' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
-    _struct_size = struct.calcsize(_struct_format)
-
-    def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time:int=0):
-        """
-        Instantiates a Traffic Controller phase request
-        :param user_id: str
-        :param controller_id: str
-        :param phase: int
-        :param arrival_time: int (Seconds until arrival)
-        """
-        self.type = TC.PHASE_REQUEST
-        self.user_id = user_id
-        self.controller_id = controller_id
-        self.phase = phase
-        self.arrival_time = arrival_time
-
-    def encode(self):
-        """
-        Converts python values into a bytes object representing a c structure for use in mqtt payload. Strings
-        are encoded as a utf-8 bytes object and packed as a char[].
-
-        struct TC_Request {
-            int type;
-            char user_id[TC.MAX_ID_BYTES];
-            char controller_id[TC.MAX_ID_BYTES];
-            int phase;
-            int arrival_time;
-            } __attribute__((PACKED));
-
-        :return: bytes
-        """
-        user_id_bytes = self.user_id.encode('utf-8')
-        controller_id_bytes = self.controller_id.encode('utf-8')
-        if len(user_id_bytes) > TC.MAX_ID_BYTES:
-            msg = "user id <%s> exceeds %d utf-8 bytes" % (self.user_id, TC.MAX_ID_BYTES)
-            raise TC_Exception(msg)
-        if len(controller_id_bytes) > TC.MAX_ID_BYTES:
-            msg = "controller id <%s> exceeds %d utf-8 bytes" % (self.controller_id, TC.MAX_ID_BYTES)
-            raise TC_Exception(msg)
-        return struct.pack(TC_Request._struct_format, self.type, user_id_bytes, controller_id_bytes,
-                           self.phase,self.arrival_time)
-
-
-    @classmethod
-    def decode(cls, payload:bytes):
-        """
-        Creates a TC_Request object from bytes objects which should have been packed using
-        TC_Request.encode()
-
-        :param payload: bytes
-        :return: TC_Request
-        """
-        if len(payload) != TC_Request._struct_size:
-            msg = 'improperly formatted TC Request payload'
-            raise TC_Exception(msg)
-
-        type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
-
-        if type != TC.PHASE_REQUEST:
-            msg = 'payload claimed to be a phase request but received code (%d)' % type
-            raise TC_Exception(msg)
-        user_id = user_id_bytes.decode()
-        controller_id = controller_id_bytes.decode()
-
-        return TC_Request(user_id, controller_id, phase, arrival_time)
-
 class TC:
     """
     Base class to hold some common attributes and methods between Server and User derived classes
@@ -315,6 +199,122 @@ class TC:
         """
         pass
 
+class TC_Will():
+    """
+    Structure for TC will payload. Sent by broker when a client has 'died'.
+    """
+    _struct_format = '!I!%ds' % (TC.MAX_ID_BYTES,)
+    _struct_size = struct.calcsize(_struct_format)
+
+    def __init__(self, id:str):
+        """
+
+        :param id: str
+        """
+        self.type = TC.WILL
+        self.id = id
+
+    def encode(self):
+        """
+        Converts will into a bytes object represent the c structure:
+        struct TC_Will {
+            int type;
+            char id[TC.MAX_ID_BYTES];
+        }  __attribute__((PACKED));
+        :return: bytes
+        """
+        id_bytes = self.id.encode('utf-8')
+        if len(id_bytes) > TC.MAX_ID_BYTES:
+            msg = "user id<%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
+            raise TC_Exception(msg)
+        return struct.pack(TC_Will._struct_format, self.type, id_bytes)
+
+    @classmethod
+    def decode(cls, payload:bytes):
+        """
+        Creates a TC_Will object from bytes object which should have been packed using TC_Will.encode()
+        :return: TC_Will object
+        """
+        if len(payload) != TC_Will._struct_size:
+            msg = 'improperly formatted TC Will payload'
+            raise TC_Exception(msg)
+        type, id_bytes = struct.unpack(TC_Will._struct_format, payload)
+        id = id_bytes.decode()
+        return TC_Will(id)
+
+
+class TC_Request():
+    """
+    Structure and methods for manipulating mqtt payloads used in traffic control requests
+    """
+
+    _struct_format = '!I!%ds!%ds!I!I' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
+    _struct_size = struct.calcsize(_struct_format)
+
+    def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time:int=0):
+        """
+        Instantiates a Traffic Controller phase request
+        :param user_id: str
+        :param controller_id: str
+        :param phase: int
+        :param arrival_time: int (Seconds until arrival)
+        """
+        self.type = TC.PHASE_REQUEST
+        self.user_id = user_id
+        self.controller_id = controller_id
+        self.phase = phase
+        self.arrival_time = arrival_time
+
+    def encode(self):
+        """
+        Converts python values into a bytes object representing a c structure for use in mqtt payload. Strings
+        are encoded as a utf-8 bytes object and packed as a char[].
+
+        struct TC_Request {
+            int type;
+            char user_id[TC.MAX_ID_BYTES];
+            char controller_id[TC.MAX_ID_BYTES];
+            int phase;
+            int arrival_time;
+            } __attribute__((PACKED));
+
+        :return: bytes
+        """
+        user_id_bytes = self.user_id.encode('utf-8')
+        controller_id_bytes = self.controller_id.encode('utf-8')
+        if len(user_id_bytes) > TC.MAX_ID_BYTES:
+            msg = "user id <%s> exceeds %d utf-8 bytes" % (self.user_id, TC.MAX_ID_BYTES)
+            raise TC_Exception(msg)
+        if len(controller_id_bytes) > TC.MAX_ID_BYTES:
+            msg = "controller id <%s> exceeds %d utf-8 bytes" % (self.controller_id, TC.MAX_ID_BYTES)
+            raise TC_Exception(msg)
+        return struct.pack(TC_Request._struct_format, self.type, user_id_bytes, controller_id_bytes,
+                           self.phase,self.arrival_time)
+
+
+    @classmethod
+    def decode(cls, payload:bytes):
+        """
+        Creates a TC_Request object from bytes objects which should have been packed using
+        TC_Request.encode()
+
+        :param payload: bytes
+        :return: TC_Request
+        """
+        if len(payload) != TC_Request._struct_size:
+            msg = 'improperly formatted TC Request payload'
+            raise TC_Exception(msg)
+
+        type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
+
+        if type != TC.PHASE_REQUEST:
+            msg = 'payload claimed to be a phase request but received code (%d)' % type
+            raise TC_Exception(msg)
+        user_id = user_id_bytes.decode()
+        controller_id = controller_id_bytes.decode()
+
+        return TC_Request(user_id, controller_id, phase, arrival_time)
+
 class Server (TC):
     """
     Traffic controller server for receiving phase requests from mqtt clients.
@@ -380,6 +380,8 @@ class Server (TC):
         """
 
         if request.phase in self.phases:
+            msg = "received request from phase %d from %s" % (request.phase, request.user_id)
+            self.output_log(msg)
             self.lock.acquire()
             grovepi.digital_write(self.phase_to_gpio[request.phase], 1)
             sleep(TC._phase_dwell)
