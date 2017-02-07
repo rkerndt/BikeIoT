@@ -204,6 +204,7 @@ class TC_Will():
     Structure for TC will payload. Sent by broker when a client has 'died'.
     """
     _struct_format = '!I!%ds' % (TC.MAX_ID_BYTES,)
+    print("_struct_format=<%s>" % _struct_format)
     _struct_size = struct.calcsize(_struct_format)
 
     def __init__(self, id:str):
