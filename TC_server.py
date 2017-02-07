@@ -35,6 +35,14 @@ class TC:
     PHASE_REQUEST = 0x01
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
 
+    # CONNACK codes: returned in rc of on_connect
+    CONNACK_LOOKUP = {mqtt.CONNACK_ACCEPTED:'successful connection',
+                      mqtt.CONNACK_REFUSED_PROTOCOL_VERSION:'failed due to incorrect protocol version',
+                      mqtt.CONNACK_REFUSED_IDENTIFIER_REJECTED:'failed due to rejected identifier',
+                      mqtt.CONNACK_REFUSED_SERVER_UNAVAILABLE:'failed due to unavailable server',
+                      mqtt.CONNACK_REFUSED_BAD_USERNAME_PASSWORD:'failed due to bad username or password',
+                      mqtt.CONNACK_REFUSED_NOT_AUTHORIZED:'failed due to not authorized'}
+
     # configuration: TODO: put this stuff into a configuration file
     _qos = 2
     _topic_base = 'tc/'
@@ -68,6 +76,22 @@ class TC:
         :return: None
         """
         print("%s %s" % (datetime.now(), msg), file=sys.stderr)
+
+    def start(self):
+        """
+        Tasks to connect to broker and begin network loop. Must be redefined
+        :return: None
+        """
+        msg = 'unimplemented start() method called'
+        raise TC_Exception(msg)
+
+    def stop(self):
+        """
+        Tasks to stop operations and disconnect from the broker. Must be redefined
+        :return: None
+        """
+        msg = 'unimplemented stop() method called'
+        raise TC_Exception(msg)
 
     @staticmethod
     def get_type(payload:bytes):
@@ -119,7 +143,13 @@ class TC:
         :param rc: int connection result
         :return: None
         """
-        pass
+        msg = TC.CONNACK_LOOKUP[rc]
+        if rc == mqtt.CONNACK_ACCEPTED:
+            userdata.output_log(msg)
+        else:
+            userdata.output_error(msg)
+            userdata.stop()
+
 
     @staticmethod
     def on_disconnect(client, userdata, flags, rc):
@@ -144,7 +174,8 @@ class TC:
         :param mqtt_msg: MQTTMessage
         :return: None
         """
-        pass
+        msg = "received message id %d" % (mqtt_msg.mid)
+        userdata.output_log(msg)
 
     @staticmethod
     def on_publish(client, userdata, mqtt_mid):
@@ -160,7 +191,8 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
-        pass
+        msg = "published message id %d" % (mqtt_mid,)
+        userdata.output_log(msg)
 
     @staticmethod
     def on_subscribe(client, userdata, mqtt_mid, granted_qos):
@@ -173,7 +205,8 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
-        pass
+        msg = "subscribe granted for message %d with qos %s" % (mqtt_mid, str(granted_qos))
+        userdata.output_log(msg)
 
     @staticmethod
     def on_unsubscribe(client, userdata, mqtt_mid):
@@ -345,6 +378,9 @@ class Server (TC):
 
         # defined required topic callbacks
         self.mqttc.will_set(TC._will_topic, TC_Will(self.id).encode())
+        self.mqttc.on_connect = TC.on_connect
+        self.mqttc.on_subscribe = TC.on_subscribe
+        self.mqttc.on_message = TC.on_message
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
         self.mqttc.message_callback_add(self.tc_topic, Server.on_topic)
 
@@ -447,6 +483,11 @@ class User(TC):
 
         # defined required topic callbacks
         self.mqttc.will_set(TC._will_topic, TC_Will(self.id).encode())
+        self.mqttc.on_connect = TC.on_connect
+        self.mqttc.on_subscribe = TC.on_subscribe
+        self.mqttc.on_message = TC.on_message
+        self.mqttc.on_publish = TC.on_publish
+        self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
 
     def start(self):
         """
@@ -458,7 +499,7 @@ class User(TC):
 
 
         # enter network loop forever, relying on interrupt handler to stop things
-        msg = "starting TC Server for controller %s" % (self.id,)
+        msg = "starting TC User with id %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.loop_start()
 
