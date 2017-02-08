@@ -51,7 +51,7 @@ class TC:
     _broker_url = 'julie.eug.kerndt.com'
     _broker_port = 1883
     _broker_keepalive = 60
-    _default_phase_map = { 1:3, 2:4, 3:4, 4:5 }
+    _default_phase_map = { 1:2, 2:3, 3:4, 4:5 }
     _phase_dwell = 0.1
 
     # general payload formats
