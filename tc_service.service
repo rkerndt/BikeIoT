@@ -8,7 +8,7 @@
 [Service]
     Type=idle
     KillMode=process
-    ExecStart=/usr/bin/python3 /home/pi/lib/python/TC_server.py beacon_1.cs.uoregon.edu
+    ExecStart=/usr/bin/python3 /home/pi/TC_server.py beacon_1.cs.uoregon.edu
 
 [Install]
     WantedBy=multi-user.target
