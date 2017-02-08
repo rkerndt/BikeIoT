@@ -3,8 +3,13 @@ Rickie Kerndt <rkerndt@cs.uoregon.edu>
 Classes and methods for receiving traffic controller phase requests.
 """
 
+try:
+    import grovepi
+    I_AM_PI = True
+except:
+    I_AM_PI = False
+
 import paho.mqtt.client as mqtt
-import grovepi
 import struct
 from datetime import datetime
 import sys
@@ -402,6 +407,10 @@ class Server (TC):
         :param controller_id: str
         :param map: list [(int,int)] or dict {int:int} mapping of phase number to gpio pin (using grovepi pin numbers)
         """
+        if not I_AM_PI:
+            msg = "class Server is only supported on Raspberry Pi with RPi._grovepi and grovepi installed"
+            raise TC_Exception(msg)
+
         super().__init__()
         self.id = controller_id
         self.tc_topic = TC._tc_topic_format % (self.id,)
