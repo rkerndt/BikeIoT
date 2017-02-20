@@ -393,9 +393,9 @@ class TC_Request(TC_Identifier):
 
         type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
 
-        #if type != TC.PHASE_REQUEST:
-        #    msg = 'payload claimed to be a phase request but received code (%d)' % type
-        #    raise TC_Exception(msg)
+        if type != TC.PHASE_REQUEST:
+            msg = 'payload claimed to be a phase request but received code (%d)' % type
+            raise TC_Exception(msg)
         user_id = user_id_bytes.decode()
         controller_id = controller_id_bytes.decode()
 
@@ -418,6 +418,30 @@ class TC_Request_On(TC_Request):
         super().__init__(user_id, controller_id, phase, arrival_time)
         self.type = TC.PHASE_REQUEST_ON
 
+    @classmethod
+    def decode(cls, payload:bytes):
+        """
+        Creates a TC_Request object from bytes objects which should have been packed using
+        TC_Request.encode()
+
+        :param payload: bytes
+        :return: TC_Request
+        """
+        if len(payload) != TC_Request._struct_size:
+            msg = 'improperly formatted TC Request payload'
+            raise TC_Exception(msg)
+
+        type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
+
+        if type != TC.PHASE_REQUEST_ON:
+            msg = 'payload claimed to be a phase request on but received code (%d)' % type
+            raise TC_Exception(msg)
+        user_id = user_id_bytes.decode()
+        controller_id = controller_id_bytes.decode()
+
+        return TC_Request_On(user_id, controller_id, phase, arrival_time)
+
+
 class TC_Request_Off(TC_Request):
     """
     TC_Request mqtt payload to set phase on
@@ -434,6 +458,28 @@ class TC_Request_Off(TC_Request):
         super().__init__(user_id, controller_id, phase, arrival_time)
         self.type = TC.PHASE_REQUEST_OFF
 
+    @classmethod
+    def decode(cls, payload:bytes):
+        """
+        Creates a TC_Request object from bytes objects which should have been packed using
+        TC_Request.encode()
+
+        :param payload: bytes
+        :return: TC_Request
+        """
+        if len(payload) != TC_Request._struct_size:
+            msg = 'improperly formatted TC Request payload'
+            raise TC_Exception(msg)
+
+        type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
+
+        if type != TC.PHASE_REQUEST_ON:
+            msg = 'payload claimed to be a phase request off but received code (%d)' % type
+            raise TC_Exception(msg)
+        user_id = user_id_bytes.decode()
+        controller_id = controller_id_bytes.decode()
+
+        return TC_Request_Off(user_id, controller_id, phase, arrival_time)
 
 class TC_Pin_State:
     """
