@@ -588,7 +588,7 @@ class TC_Relay(threading.Thread):
 
         self._lock.acquire()
         self._update.clear()
-        for pin_state in self._pin_states:
+        for pin_state in self._pin_states.values():
             if pin_state.state == TC.PHASE_ON:
                 # turn off if exceed max time on
                 if (datetime.now() - pin_state.last_set) > timedelta(seconds=TC.MAX_PHASE_ON_SECS):
