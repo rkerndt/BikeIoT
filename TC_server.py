@@ -393,9 +393,9 @@ class TC_Request(TC_Identifier):
 
         type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
 
-        if type != TC.PHASE_REQUEST:
-            msg = 'payload claimed to be a phase request but received code (%d)' % type
-            raise TC_Exception(msg)
+        #if type != TC.PHASE_REQUEST:
+        #    msg = 'payload claimed to be a phase request but received code (%d)' % type
+        #    raise TC_Exception(msg)
         user_id = user_id_bytes.decode()
         controller_id = controller_id_bytes.decode()
 
