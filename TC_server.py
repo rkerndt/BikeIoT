@@ -473,7 +473,7 @@ class TC_Request_Off(TC_Request):
 
         type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
 
-        if type != TC.PHASE_REQUEST_ON:
+        if type != TC.PHASE_REQUEST_OFF:
             msg = 'payload claimed to be a phase request off but received code (%d)' % type
             raise TC_Exception(msg)
         user_id = user_id_bytes.decode()
@@ -711,8 +711,11 @@ class Server (TC):
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
             request_type = Server.get_type(mqtt_msg.payload)
-            if request_type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
-                request = TC_Request.decode(mqtt_msg.payload)
+            if request_type == TC.PHASE_REQUEST_ON:
+                request = TC_Request_On.decode(mqtt_msg.payload)
+                userdata.request_phase(request)
+            elif request_type == TC.PHASE_REQUEST_OFF:
+                request = TC_Request_Off.decode(mqtt_msg.payload)
                 userdata.request_phase(request)
             else:
                 msg = "received payload of type %d but expecting %d" % (request_type, TC.PHASE_REQUEST)
