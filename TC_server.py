@@ -11,7 +11,7 @@ except:
 
 import paho.mqtt.client as mqtt
 import struct
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 import threading
 from time import sleep
@@ -37,7 +37,14 @@ class TC:
 
     # Constants
     WILL = 0x00
-    PHASE_REQUEST = 0x01
+    PHASE_REQUEST =     0x01
+    PHASE_REQUEST_ON =  0x02
+    PHASE_REQUEST_OFF = 0x03
+    MAX_PHASE_ON_SECS = 0x60
+
+    PHASE_ON =  0x01
+    PHASE_OFF = 0x00
+
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
 
     # CONNACK codes: returned in rc of on_connect
@@ -372,6 +379,38 @@ class TC_Request(TC_Identifier):
         return bytearray(packed)
 
 
+class TC_Request_On(TC_Request):
+    """
+    TC_Request mqtt payload to set phase on
+    """
+
+    def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time:int=0):
+        """
+
+        :param user_id:
+        :param controller_id:
+        :param phase:
+        :param arrival_time:
+        """
+        super().__init__(user_id, controller_id, phase, arrival_time)
+        self.type = TC.PHASE_REQUEST_ON
+
+class TC_Request_Off(TC_Request):
+    """
+    TC_Request mqtt payload to set phase on
+    """
+
+    def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time: int = 0):
+        """
+
+        :param user_id:
+        :param controller_id:
+        :param phase:
+        :param arrival_time:
+        """
+        super().__init__(user_id, controller_id, phase, arrival_time)
+        self.type = TC.PHASE_REQUEST_OFF
+
     @classmethod
     def decode(cls, payload:bytes):
         """
@@ -394,6 +433,124 @@ class TC_Request(TC_Identifier):
         controller_id = controller_id_bytes.decode()
 
         return TC_Request(user_id, controller_id, phase, arrival_time)
+
+class TC_Pin_State:
+    """
+    State information we want to keep of a phase loop
+    """
+
+    def __init__(self, pin_num):
+        self.num = pin_num
+        self.last_set = datetime.now()
+        self.state = TC.PHASE_OFF
+
+
+class TC_Relay(threading.Thread):
+    """
+    Controls relays effecting Traffic Controller Phases. Maintains local phase state and setter methods that ensure
+    relayy access methods are executed atomically.
+    """
+
+    def __init__(self, pins, max_on_time=TC.MAX_PHASE_ON_SECS):
+        """
+        Sets up control of these pins, relies on server to provide a valid gpio pin list
+        A timer is setup to check states every 30 seconds. This allows PHASE_ON to timeout
+        after TC.MAX_PHASE_ON_SECS. Acts as a fail safe so that states are not kept on
+        indefinitely.
+        :param self:
+        :param pins: list of grovepi pin ids used for relay control
+        :return: None
+        """
+        super().__init__()
+        self._max_on_time = max_on_time
+        self._valid_pins = frozenset(pins)
+        self._pin_states = dict()
+        self._runnable = True
+        self._lock = threading.Lock()
+        self._update = threading.Event()
+        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+
+        for pin in pins:
+            self._pin_states[pin] = TC_Pin_State(pin)
+
+    def set_phase_on(self, pin):
+        """
+        Sets the state of the pin to on
+        :param pin:
+        :return: None
+        """
+        self._lock.acqurie()
+        self._timer.cancel()
+        if pin in self._valid_pins:
+            pin_state = self._pin_states[pin]
+            pin_state.state= TC.PHASE_ON
+            pin_state.last_set = datetime.now()
+        self._update.set()
+        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+        self._lock.release()
+
+    def set_phase_off(self, pin):
+        """
+        Sets the state of pin to off
+        :param pin:
+        :return: None
+        """
+        self._lock.acquire()
+        self._timer.cancel()
+        if pin in self._valid_pins:
+            pin_state = self._pin_states[pin]
+            pin_state.state = TC.PHASE_OFF
+            pin_state.last_set = datetime.now()
+        self._update.set()
+        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+        self._lock.release()
+
+    def stop(self):
+        """
+        Quits thread
+        :return: None
+        """
+        self._runnable = False
+
+    def run(self):
+        """
+
+        :return: None
+        """
+        while self._runnable:
+            self._update.wait()
+            self._check_states()
+
+
+    def _timeout(self):
+        """
+        Calls _check_states and resets the timer
+        :return: None
+        """
+        self._check_states()
+        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+
+    def _check_states(self):
+        """
+        Passes through pin states making gpio calls to set relay to the corresponding state
+        :return: None
+        """
+
+        self._lock.acquire()
+        self._update.clear()
+        for pin_state in self._pin_states:
+            if pin_state.state == TC.PHASE_ON:
+                # turn off if exceed max time on
+                if (datetime.now() - pin_state.last_set) > timedelta(seconds=TC.MAX_PHASE_ON_SECS):
+                    pin_state.state = TC.PHASE_OFF
+
+            # TODO: check against actual gpio pin state rather than just setting
+            # TODO: also need to add confirmation that write was successful
+            value = 0
+            if pin_state.state == TC.PHASE_ON:
+                value = 1
+            grovepi.digitalWrite(pin_state.num, value)
+        self._lock.release()
 
 class Server (TC):
     """
@@ -418,6 +575,9 @@ class Server (TC):
         self.phases = frozenset(self.phase_to_gpio.keys())
 
         self.mqttc = mqtt.Client(controller_id)
+
+        # Separate thread to manage TC relays
+        self._relays = TC_Relay(self.phase_to_gpio.values())
 
         # using password until we can get TLS setup with user certificates
         self.mqttc.username_pw_set(self.id)
@@ -447,6 +607,7 @@ class Server (TC):
 
         # enter network loop forever, relying on interrupt handler to stop things
         msg = "starting TC Server for controller %s" % (self.id,)
+        self._relays.start()
         self.output_log(msg)
         self.mqttc.loop_forever()
 
@@ -470,12 +631,10 @@ class Server (TC):
         if request.phase in self.phases:
             msg = "processing request for phase %d from %s in %d seconds" % (request.phase, request.id, request.arrival_time)
             self.output_log(msg)
-            self.lock.acquire()
-            grovepi.digitalWrite(self.phase_to_gpio[request.phase], 1)
-            sleep(TC._phase_dwell)
-            grovepi.digitalWrite(self.phase_to_gpio[request.phase], 0)
-            self.lock.release()
-
+            if request.type == TC.PHASE_REQUEST_ON:
+                self._relays.set_phase_on(self.phase_to_gpio[request.phase])
+            elif request.type == TC.PHASE_REQUEST_OFF:
+                self._relays.set_phase_off(self.phase_to_gpio[request.phase])
         else:
             msg = "received an invalid phase number %d" % (request.phase,)
             self.output_error(msg)
@@ -496,7 +655,7 @@ class Server (TC):
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
             request_type = Server.get_type(mqtt_msg.payload)
-            if request_type == TC.PHASE_REQUEST:
+            if request_type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
                 request = TC_Request.decode(mqtt_msg.payload)
                 userdata.request_phase(request)
             else:
@@ -571,15 +730,29 @@ class User(TC):
 
     def send_phase_request(self, controller_id:str, phase:int, arrival_time:int=0):
         """
-        Creates a TC_Request object and publishes on the appropriate topic
+        Creates a TC_Request_On object and publishes on the appropriate topic
         :param controller_id: str
         :param phase: int
         :param arrival_time: int
         :return: None
         """
-        request = TC_Request(self.id, controller_id, phase, arrival_time)
+        request = TC_Request_On(self.id, controller_id, phase, arrival_time)
         topic = TC._tc_topic_format % controller_id
         msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, arrival_time)
+        self.output_log(msg)
+        self.mqttc.publish(topic, request.encode())
+
+    def send_phase_release(self, controller_id:str, phase:int, departure_time:int=0):
+        """
+        Creates a TC_Reqeust_Off object and publishes on the appropriate topic
+        :param controller_id:
+        :param phase:
+        :param departure_time:
+        :return: None
+        """
+        request = TC_Request_Off(self.id, controller_id, phase, departure_time)
+        topic = TC._tc_topic_format % controller_id
+        msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, departure_time)
         self.output_log(msg)
         self.mqttc.publish(topic, request.encode())
 
