@@ -60,7 +60,7 @@ class TC:
     _topic_base = 'tc/'
     _will_topic =  _topic_base + 'will/'
     _tc_topic_format = _topic_base + '%s/'
-    _broker_url = 'julie.eug.kerndt.com'
+    _broker_url = 'test.mosquitto.com'
     _broker_port = 1883
     _broker_keepalive = 60
     _default_phase_map = { 1:2, 2:3, 3:4, 4:5 }
