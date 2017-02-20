@@ -634,8 +634,12 @@ class Server (TC):
             self.output_log(msg)
             if request.type == TC.PHASE_REQUEST_ON:
                 self._relays.set_phase_on(self.phase_to_gpio[request.phase])
+                msg = "set phase %d to on for %s" % (request.phase, request.id)
+                self.output(msg)
             elif request.type == TC.PHASE_REQUEST_OFF:
                 self._relays.set_phase_off(self.phase_to_gpio[request.phase])
+                msg = "set phase %d to off for %s" % (request.phase, request.id)
+                self.output(msg)
         else:
             msg = "received an invalid phase number %d" % (request.phase,)
             self.output_error(msg)
