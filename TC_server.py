@@ -527,7 +527,7 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         print("entered set_phase_on")
-        self._lock.acqurie()
+        self._lock.acquire()
         print("set_phase_on acquired lock")
         self._timer.cancel()
         if pin in self._valid_pins:
