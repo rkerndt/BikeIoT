@@ -620,7 +620,9 @@ class Server (TC):
         """
         msg = "stopping TC Server for controller %s" % (self.id,)
         self.output_log(msg)
+        self._relays.stop()
         self.mqttc.disconnect()
+        self._relays.join()
 
     def request_phase(self, request:TC_Request):
         """
