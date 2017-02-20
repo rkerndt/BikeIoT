@@ -480,7 +480,9 @@ class TC_Relay(threading.Thread):
         :param pin:
         :return: None
         """
+        print("entered set_phase_on")
         self._lock.acqurie()
+        print("set_phase_on acquired lock")
         self._timer.cancel()
         if pin in self._valid_pins:
             pin_state = self._pin_states[pin]
@@ -489,6 +491,7 @@ class TC_Relay(threading.Thread):
         self._update.set()
         self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
         self._lock.release()
+        print("set_phase_on released lock")
 
     def set_phase_off(self, pin):
         """
