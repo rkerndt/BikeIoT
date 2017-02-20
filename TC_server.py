@@ -635,7 +635,7 @@ class Server (TC):
         """
 
         if request.phase in self.phases:
-            msg = "processing request type %d for phase %d from %s in %d seconds" % (reqeust.type, request.phase, request.id, request.arrival_time)
+            msg = "processing request type %d for phase %d from %s in %d seconds" % (request.type, request.phase, request.id, request.arrival_time)
             self.output_log(msg)
             if request.type == TC.PHASE_REQUEST_ON:
                 self._relays.set_phase_on(self.phase_to_gpio[request.phase])
