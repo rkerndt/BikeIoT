@@ -631,7 +631,7 @@ class Server (TC):
         self._relays = TC_Relay(self.phase_to_gpio.values())
 
         # using password until we can get TLS setup with user certificates
-        self.mqttc.username_pw_set(self.id)
+        #self.mqttc.username_pw_set(self.id)
 
         # pass reference to self for use in callbacks
         self.mqttc.user_data_set(self)
@@ -750,7 +750,7 @@ class User(TC):
         self.mqttc = mqtt.Client(user_id)
 
         # using password until we can get TLS setup with user certificates
-        self.mqttc.username_pw_set(self.id)
+        #self.mqttc.username_pw_set(self.id)
 
         # pass reference to self for use in callbacks
         self.mqttc.user_data_set(self)
