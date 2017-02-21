@@ -4,6 +4,7 @@
 
 [Unit]
     Description=Traffic Controller BikeIoT
+    After=network.target
 
 [Service]
     Type=idle
