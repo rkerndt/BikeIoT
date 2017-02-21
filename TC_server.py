@@ -563,6 +563,7 @@ class TC_Relay(threading.Thread):
         self._runnable = False
         self._update.set()
 
+
     def run(self):
         """
 
@@ -674,7 +675,9 @@ class Server (TC):
         msg = "stopping TC Server for controller %s" % (self.id,)
         self.output_log(msg)
         self._relays.stop()
+        print("stopped relays")
         self.mqttc.disconnect()
+        print("waiting for relay to die")
         self._relays.join()
 
     def request_phase(self, request:TC_Request):
