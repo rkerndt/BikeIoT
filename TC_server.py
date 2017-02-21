@@ -678,7 +678,7 @@ class Server (TC):
         print("stopped relays")
         self.mqttc.disconnect()
         print("waiting for relay to die")
-        self._relays.join()
+        #self._relays.join()
 
     def request_phase(self, request:TC_Request):
         """
