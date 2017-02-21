@@ -561,6 +561,7 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         self._runnable = False
+        self._timer.cancel()
         self._update.set()
 
 
@@ -678,7 +679,7 @@ class Server (TC):
         print("stopped relays")
         self.mqttc.disconnect()
         print("waiting for relay to die")
-        #self._relays.join()
+        self._relays.join()
 
     def request_phase(self, request:TC_Request):
         """
