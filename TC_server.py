@@ -561,6 +561,7 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         self._runnable = False
+        self._update.set()
 
     def run(self):
         """
@@ -569,8 +570,9 @@ class TC_Relay(threading.Thread):
         """
         self._timer.start()
         while self._runnable:
-            self._update.wait()
             self._check_states()
+            self._update.wait()
+
 
 
     def _timeout(self):
