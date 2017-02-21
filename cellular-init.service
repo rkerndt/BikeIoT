@@ -1,5 +1,6 @@
 [Unit]
 Description=Initialize Cellular Dongle
+After=network.target
 
 [Service]
 Type=oneshot
