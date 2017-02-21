@@ -652,7 +652,7 @@ class Server (TC):
         :return: None
         """
 
-        self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive, TC._bind_address)
+        self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
 
         # subscribe to own controller_id topic and will topic to get messages intended for me
         self.mqttc.subscribe([(self.tc_topic, TC._qos), (TC._will_topic, TC._qos)])
