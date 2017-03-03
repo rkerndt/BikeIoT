@@ -64,7 +64,7 @@ class TC:
     _topic_base = 'tc/'
     _will_topic =  _topic_base + 'will/'
     _tc_topic_format = _topic_base + '%s/'
-    _broker_url = 'test.mosquitto.org'
+    _broker_url = 'iot.eclipse.org' #iot.eclipse.org or test.mosquitto.org
     _broker_port = 1883
     _broker_keepalive = 60
     _bind_address = "100.81.111.18"
@@ -671,8 +671,6 @@ class Server (TC):
                 msg = "starting TC Server for controller %s" % (self.id,)
                 self.output_log(msg)
                 self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
-                msg = "connect successful"
-                self.output_log(msg)
             except:
                 #TODO this is catching sigint and sigterm which we do >not< want to happen
                 connected = False
