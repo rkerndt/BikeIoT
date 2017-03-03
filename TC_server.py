@@ -93,7 +93,7 @@ class TC:
         print(fmt, file=stream)
         stream.flush()
 
-    def output_error(self, msg:str):
+    def output_error(self, msg:str):?
         """
         Prints message to stderr
         :param msg:str
@@ -503,15 +503,15 @@ class TC_Request_Off(TC_Request):
 
         return TC_Request_Off(user_id, controller_id, phase, arrival_time)
 
-class TC_Pin_State:
+class TC_phase_request:
     """
     State information we want to keep of a phase loop
     """
 
-    def __init__(self, pin_num):
+    def __init__(self, pin_num:int, user:str):
         self.num = pin_num
-        self.last_set = datetime.now()
-        self.state = TC.PHASE_OFF
+        self.timestamp = datetime.now()
+        self.user = user
 
 
 class TC_Relay(threading.Thread):
@@ -531,50 +531,54 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         super().__init__()
-        self._max_on_time = max_on_time
+        self._max_delta_time = timedelta(seconds=max_on_time)
         self._valid_pins = frozenset(pins)
-        self._pin_states = dict()
+        self._phase_queues = dict()
         self._runnable = True
         self._lock = threading.Lock()
         self._update = threading.Event()
         self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
 
         for pin in pins:
-            self._pin_states[pin] = TC_Pin_State(pin)
+            self._phase_queues[pin] = dict()
 
-    def set_phase_on(self, pin):
+    def set_phase_on(self, pin:int, user:str):
         """
         Sets the state of the pin to on
         :param pin:
         :return: None
         """
-        self._lock.acquire()
-        self._timer.cancel()
         if pin in self._valid_pins:
-            pin_state = self._pin_states[pin]
-            pin_state.state= TC.PHASE_ON
-            pin_state.last_set = datetime.now()
-        self._update.set()
-        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
-        self._timer.start()
-        self._lock.release()
+            self._lock.acquire()
+            self._timer.cancel()
 
-    def set_phase_off(self, pin):
+            phase_queue = self._phase_queues[pin]
+            if user in phase_queue:
+                phase_queue[user].timestamp = datetime.now()
+            else:
+                phase_queue[user] = TC_phase_request(pin, user)
+
+            self._update.set()
+            self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+            self._timer.start()
+            self._lock.release()
+
+    def set_phase_off(self, pin:int, user:str):
         """
         Sets the state of pin to off
         :param pin:
         :return: None
         """
-        self._lock.acquire()
-        self._timer.cancel()
         if pin in self._valid_pins:
-            pin_state = self._pin_states[pin]
-            pin_state.state = TC.PHASE_OFF
-            pin_state.last_set = datetime.now()
-        self._update.set()
-        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
-        self._timer.start()
-        self._lock.release()
+            self._lock.acquire()
+            phase_queue = self._phase_queues[pin]
+            if user in phase_queue:
+                self._timer.cancel()
+                del phase_queue[user]
+                self._update.set()
+                self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+                self._timer.start()
+            self._lock.release()
 
     def stop(self):
         """
@@ -609,24 +613,24 @@ class TC_Relay(threading.Thread):
 
     def _check_states(self):
         """
-        Passes through pin states making gpio calls to set relay to the corresponding state
+        Passes through phase queues making gpio calls to set relay to the corresponding phase
         :return: None
         """
 
         self._lock.acquire()
         self._update.clear()
-        for pin_state in self._pin_states.values():
-            if pin_state.state == TC.PHASE_ON:
-                # turn off if exceed max time on
-                if (datetime.now() - pin_state.last_set) > timedelta(seconds=TC.MAX_PHASE_ON_SECS):
-                    pin_state.state = TC.PHASE_OFF
+        for pin, phase_queue in self._phase_queues.items():
+            for phase_request in list(phase_queue.values()):
+                # turn off if exceed max time
+                if (datetime.now() - phase_request.timestamp) > self._max_delta_time:
+                    del phase_queue[phase_request.user]
 
             # TODO: check against actual gpio pin state rather than just setting
             # TODO: also need to add confirmation that write was successful
             value = 0
-            if pin_state.state == TC.PHASE_ON:
+            if len(phase_queue) > 0:
                 value = 1
-            grovepi.digitalWrite(pin_state.num, value)
+            grovepi.digitalWrite(pin, value)
         self._lock.release()
 
 class Server (TC):
