@@ -78,23 +78,36 @@ class TC:
     def __init__(self):
         self.lock = threading.Lock()
 
+    def output_msg(self, msg:str, stream):
+        """
+        Outputs msg to IOText stream
+        :param msg:
+        :param stream:
+        :return: None
+        """
+        if isinstance(self, User):
+            fmt = "%s %s" % (datetime.now(), msg)
+        else:
+            fmt = "%s" % (msg,)
+
+        print(fmt, file=stream)
+        stream.flush()
+
     def output_error(self, msg:str):
         """
-        Prints timestamp and message to stderr
+        Prints message to stderr
         :param msg:str
         :return: None
         """
-        print("%s %s" % (datetime.now(), msg), file=sys.stderr)
-        sys.stderr.flush()
+        self.output_msg(msg, sys.stderr)
 
     def output_log(self, msg:str):
         """
-        Prints timestamp and message to stdout
+        Prints message to stdout
         :param msg: str
         :return: None
         """
-        print("%s %s" % (datetime.now(), msg), file=sys.stdout)
-        sys.stdout.flush()
+        self.output_msg(msg, sys.stdout)
 
     def start(self):
         """
