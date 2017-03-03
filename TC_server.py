@@ -731,11 +731,11 @@ class Server (TC):
             msg = "processing request type %d for phase %d from %s in %d seconds" % (request.type, request.phase, request.id, request.arrival_time)
             self.output_log(msg)
             if request.type == TC.PHASE_REQUEST_ON:
-                self._relays.set_phase_on(self.phase_to_gpio[request.phase])
+                self._relays.set_phase_on(self.phase_to_gpio[request.phase], request.id)
                 msg = "set phase %d to on for %s" % (request.phase, request.id)
                 self.output_log(msg)
             elif request.type == TC.PHASE_REQUEST_OFF:
-                self._relays.set_phase_off(self.phase_to_gpio[request.phase])
+                self._relays.set_phase_off(self.phase_to_gpio[request.phase], request.id)
                 msg = "set phase %d to off for %s" % (request.phase, request.id)
                 self.output_log(msg)
         else:
