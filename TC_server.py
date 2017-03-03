@@ -93,7 +93,7 @@ class TC:
         print(fmt, file=stream)
         stream.flush()
 
-    def output_error(self, msg:str):?
+    def output_error(self, msg:str):
         """
         Prints message to stderr
         :param msg:str
