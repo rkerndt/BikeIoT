@@ -92,7 +92,7 @@ class TC:
         :param msg: str
         :return: None
         """
-        print("%s %s" % (datetime.now(), msg), file=sys.stderr)
+        print("%s %s" % (datetime.now(), msg), file=sys.stdout)
 
     def start(self):
         """
@@ -669,8 +669,9 @@ class Server (TC):
                 self.output_log(msg)
                 self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
                 msg = "connect successful"
-                self.output_error(msg)
+                self.output_log(msg)
             except:
+                #TODO this is catching sigint and sigterm which we do >not< want to happen
                 connected = False
                 msg = "connect attempt failed: %s retry in %f seconds" % (sys.exc_info()[0], connection_retry_delay)
                 self.output_error(msg)
