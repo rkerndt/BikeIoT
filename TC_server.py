@@ -44,7 +44,7 @@ class TC:
     CONNECTION_RETRY_FACTOR = 2
     INITIAL_CONNECTION_RETRY_DELAY = 0.1
     MAX_CONNECTION_RETRY_DELAY = 60
-
+    DEFAULT_QOS = 2
 
     PHASE_ON =  0x01
     PHASE_OFF = 0x00
@@ -165,7 +165,7 @@ class TC:
         if rc == mqtt.CONNACK_ACCEPTED:
             userdata.output_log(msg)
         else:
-            userdata.output_error(msg)
+            userdata.output_log(msg)
             userdata.stop()
 
 
@@ -179,7 +179,9 @@ class TC:
         :param rc: int disconnect result
         :return: None
         """
-        pass
+        if rc != 0:
+            msg = "disconnected from broker: %s" % mqtt.error_string(rc)
+            userdata.output_log(msg)
 
     @staticmethod
     def on_message(client, userdata, mqtt_msg):
@@ -648,6 +650,7 @@ class Server (TC):
         # defined required topic callbacks
         self.mqttc.will_set(TC._will_topic, TC_Identifier(TC.WILL, self.id).encode())
         self.mqttc.on_connect = TC.on_connect
+        self.mqttc.on_disconnect = TC.on_disconnect
         self.mqttc.on_subscribe = TC.on_subscribe
         self.mqttc.on_message = TC.on_message
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
@@ -774,7 +777,7 @@ class User(TC):
         super().__init__()
         self.id = user_id
         self.mqttc = mqtt.Client(user_id)
-
+        self.qos = TC.DEFAULT_QOS
         # using password until we can get TLS setup with user certificates
         #self.mqttc.username_pw_set(self.id)
 
@@ -784,6 +787,7 @@ class User(TC):
         # defined required topic callbacks
         self.mqttc.will_set(TC._will_topic, TC_Identifier(TC.WILL, self.id).encode())
         self.mqttc.on_connect = TC.on_connect
+        self.mqttc.on_disconnect = TC.on_disconnect
         self.mqttc.on_subscribe = TC.on_subscribe
         self.mqttc.on_message = TC.on_message
         self.mqttc.on_publish = TC.on_publish
@@ -826,7 +830,7 @@ class User(TC):
         topic = TC._tc_topic_format % controller_id
         msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, arrival_time)
         self.output_log(msg)
-        self.mqttc.publish(topic, request.encode())
+        self.mqttc.publish(topic, request.encode(), self.qos)
 
     def send_phase_release(self, controller_id:str, phase:int, departure_time:int=0):
         """
@@ -840,7 +844,7 @@ class User(TC):
         topic = TC._tc_topic_format % controller_id
         msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, departure_time)
         self.output_log(msg)
-        self.mqttc.publish(topic, request.encode())
+        self.mqttc.publish(topic, request.encode(), self.qos)
 
 def main(argv):
     """
