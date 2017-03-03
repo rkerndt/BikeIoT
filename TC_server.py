@@ -665,6 +665,8 @@ class Server (TC):
         while not connected:
             try:
                 connected = True
+                msg = "starting TC Server for controller %s" % (self.id,)
+                self.output_log(msg)
                 self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
                 msg = "connect successful"
                 self.output_error(msg)
@@ -681,9 +683,7 @@ class Server (TC):
         self.mqttc.subscribe([(self.tc_topic, TC._qos), (TC._will_topic, TC._qos)])
 
         # enter network loop forever, relying on interrupt handler to stop things
-        msg = "starting TC Server for controller %s" % (self.id,)
         self._relays.start()
-        self.output_log(msg)
         self.mqttc.loop_forever()
 
     def stop(self):
