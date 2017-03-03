@@ -672,7 +672,7 @@ class Server (TC):
                 self.output_error(msg)
             except:
                 connected = False
-                msg = "connect attempt failed: %s" % (sys.exc_info()[0],)
+                msg = "connect attempt failed: %s retry in %f seconds" % (sys.exc_info()[0], connection_retry_delay)
                 self.output_error(msg)
                 sleep(connection_retry_delay)
                 connection_retry_delay *= TC.CONNECTION_RETRY_FACTOR
