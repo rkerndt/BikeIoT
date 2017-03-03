@@ -85,6 +85,7 @@ class TC:
         :return: None
         """
         print("%s %s" % (datetime.now(), msg), file=sys.stderr)
+        sys.stderr.flush()
 
     def output_log(self, msg:str):
         """
@@ -93,6 +94,7 @@ class TC:
         :return: None
         """
         print("%s %s" % (datetime.now(), msg), file=sys.stdout)
+        sys.stdout.flush()
 
     def start(self):
         """
