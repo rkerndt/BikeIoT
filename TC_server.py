@@ -666,6 +666,8 @@ class Server (TC):
             try:
                 connected = True
                 self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
+                msg = "connect successful"
+                self.output_error(msg)
             except:
                 connected = False
                 msg = "connect attempt failed: %s" % (sys.exc_info()[0],)
