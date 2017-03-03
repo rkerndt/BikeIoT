@@ -170,7 +170,7 @@ class TC:
 
 
     @staticmethod
-    def on_disconnect(client, userdata, flags, rc):
+    def on_disconnect(client, userdata, rc):
         """
         Called when the client disconnects from the broker
         :param client: paho.mqtt.client
