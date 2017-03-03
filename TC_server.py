@@ -41,6 +41,10 @@ class TC:
     PHASE_REQUEST_ON =  0x02
     PHASE_REQUEST_OFF = 0x03
     MAX_PHASE_ON_SECS = 0x60
+    CONNECTION_RETRY_FACTOR = 2
+    INITIAL_CONNECTION_RETRY_DELAY = 0.1
+    MAX_CONNECTION_RETRY_DELAY = 60
+
 
     PHASE_ON =  0x01
     PHASE_OFF = 0x00
@@ -656,7 +660,20 @@ class Server (TC):
         :return: None
         """
 
-        self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
+        connected = False
+        connection_retry_delay = TC.INITIAL_CONNECTION_RETRY_DELAY
+        while not connected:
+            try:
+                connected = True
+                self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
+            except:
+                connected = False
+                msg = "connect attempt failed: %s" % (sys.exc_info()[0],)
+                self.output_error(msg)
+                sleep(connection_retry_delay)
+                connection_retry_delay *= TC.CONNECTION_RETRY_FACTOR
+                if connection_retry_delay > TC.MAX_CONNECTION_RETRY_DELAY:
+                    connection_retry_delay = TC.MAX_CONNECTION_RETRY_DELAY
 
         # subscribe to own controller_id topic and will topic to get messages intended for me
         self.mqttc.subscribe([(self.tc_topic, TC._qos), (TC._will_topic, TC._qos)])
