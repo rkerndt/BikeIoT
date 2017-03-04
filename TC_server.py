@@ -536,7 +536,7 @@ class TC_Pending(threading.Thread):
         """
         Called by timer to clear event
         """
-        self._event.clear()
+        self._event.set()
 
     def run(self):
         """
@@ -604,7 +604,7 @@ class TC_Pending(threading.Thread):
         """
         self.runnable = False
         if self._timer:
-            self._timer.cance()
+            self._timer.cancel()
         self._event.set()
 
 
