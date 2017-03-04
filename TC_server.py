@@ -802,9 +802,12 @@ class Server (TC):
         self.output_log(msg)
         self.mqttc.disconnect()
         if self._pending.isAlive():
+            msg = "stopping pending queue"
+            self.output_log(msg)
             self._pending.stop()
             self._pending.join()
         if self._relays.isAlive():
+            msg = "stopping relays"
             self._relays.stop()
             self._relays.join()
 
