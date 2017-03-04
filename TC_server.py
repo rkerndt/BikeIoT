@@ -16,7 +16,7 @@ import sys
 import threading
 from time import sleep
 import signal
-
+import socket
 
 class TC_Exception (Exception):
     """
@@ -774,10 +774,11 @@ class Server (TC):
                 msg = "starting TC Server for controller %s" % (self.id,)
                 self.output_log(msg)
                 self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
-            except:
-                #TODO this is catching sigint and sigterm which we do >not< want to happen
+            except (socket.gaierror, socket.herror, socket.timeout) as e:
+                # probably network initialization delayed at startup, retry with progressive delay
+                error_int, error_string = e.args
                 connected = False
-                msg = "connect attempt failed: %s retry in %f seconds" % (sys.exc_info()[0], connection_retry_delay)
+                msg = "connect attempt failed (%d) %s:retry in %f seconds" % (error_int, error_string, connection_retry_delay)
                 self.output_error(msg)
                 sleep(connection_retry_delay)
                 connection_retry_delay *= TC.CONNECTION_RETRY_FACTOR
