@@ -17,6 +17,7 @@ import threading
 from time import sleep
 import signal
 
+
 class TC_Exception (Exception):
     """
     Class for catching error messages.
@@ -45,7 +46,7 @@ class TC:
     INITIAL_CONNECTION_RETRY_DELAY = 0.1
     MAX_CONNECTION_RETRY_DELAY = 60
     DEFAULT_QOS = 2
-
+    CHECK_PENDING_INTERVAL = 1
     PHASE_ON =  0x01
     PHASE_OFF = 0x00
 
@@ -508,10 +509,84 @@ class TC_phase_request:
     State information we want to keep of a phase loop
     """
 
-    def __init__(self, pin_num:int, user:str):
+    def __init__(self, pin_num:int, user:str, arrival_time:int, op=TC.PHASE_REQUEST_ON):
         self.num = pin_num
         self.timestamp = datetime.now()
         self.user = user
+        self.op = op
+        self.arrival_time = arrival_time
+
+class TC_Pending(threading.Thread):
+    """
+    Manages a queue of Traffic Controller phase requests which have non-zero arrival time. Once requests hit
+    zero seconds call is made to TC_Relay
+    """
+
+    def __init__(self, parent:Server):
+        super().__init__()
+        self._parent = parent
+        self._queue = dict()
+        self._runnable = True
+        self._lock = threading.Lock()
+        self._interval = TC.CHECK_PENDING_INTERVAL
+
+    def run(self):
+        """
+        Loops at _interval seconds and decrements arrival_time for queued phase requests.
+        :return: None
+        """
+
+        while self._runnable:
+            self._lock.acquire()
+            for user, request in list(self._queue.items()):
+                request.arrival_time -= self._interval
+                if request.arrival_time <= 0:
+                    del self._queue[user]
+                    if request.op == TC.PHASE_REQUEST_ON:
+                        msg = "executing %s request for phase %d on" % (request.user, request.num)
+                        self._parent._relays.set_phase_on(request)
+                    else:
+                        msg = "executing %s request for phase %d release" % (request.user, request.num)
+                        self._parent._relays.set_phase_off(request)
+                    self._parent.output_log(msg)
+            self._lock.release()
+            sleep(self._interval)
+
+    def add_request(self, request:TC_phase_request):
+        """
+        Adds request to pending queue if arrival_time is non-zero, otherwise passes request onto relays
+        :param request:
+        :return: None
+        """
+
+        if request.arrival_time == 0:
+            if request.op == TC.PHASE_REQUEST_ON:
+                self._parent._relays.set_phase_on(request)
+                msg = "executing %s request for phase %d on" % (request.user, request.num)
+            else:
+                self._parent._relays.set_phase_off(request)
+                msg = "executing %s request for phase %d release" % (request.user, request.num)
+            self._parent.output_log(msg)
+        else:
+            self._lock.acquire()
+            if request.user in self._queue:
+                self._queue[request.user].arrival_time = request.arrival_time
+                msg = "updating %s arrival time to %d" % (request.user, request.arrival_time)
+            else:
+                self._queue[request.user] = request
+                msg = "adding request from %s for phase %d op %d to pending" % (request.user, request.num, request.op)
+            self._parent.output_log(msg)
+            self._lock.release()
+
+
+    def stop(self):
+        """
+        Sets runnable to False causing loop to exit at next interation
+        :return: None
+        """
+        self.runnable = False
+
+
 
 
 class TC_Relay(threading.Thread):
@@ -520,7 +595,7 @@ class TC_Relay(threading.Thread):
     relayy access methods are executed atomically.
     """
 
-    def __init__(self, pins, max_on_time=TC.MAX_PHASE_ON_SECS):
+    def __init__(self, parent, pins, max_on_time=TC.MAX_PHASE_ON_SECS):
         """
         Sets up control of these pins, relies on server to provide a valid gpio pin list
         A timer is setup to check states every 30 seconds. This allows PHASE_ON to timeout
@@ -531,6 +606,7 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         super().__init__()
+        self._parent = parent
         self._max_delta_time = timedelta(seconds=max_on_time)
         self._valid_pins = frozenset(pins)
         self._phase_queues = dict()
@@ -542,39 +618,40 @@ class TC_Relay(threading.Thread):
         for pin in pins:
             self._phase_queues[pin] = dict()
 
-    def set_phase_on(self, pin:int, user:str):
+    def set_phase_on(self, request:TC_phase_request):
         """
         Sets the state of the pin to on
         :param pin:
         :return: None
         """
-        if pin in self._valid_pins:
+        if request.num in self._valid_pins:
             self._lock.acquire()
             self._timer.cancel()
 
-            phase_queue = self._phase_queues[pin]
-            if user in phase_queue:
-                phase_queue[user].timestamp = datetime.now()
+            phase_queue = self._phase_queues[request.num]
+            if request.user in phase_queue:
+                phase_queue[request.user].timestamp = datetime.now()
             else:
-                phase_queue[user] = TC_phase_request(pin, user)
+                request.timestamp = datetime.now()
+                phase_queue[request.user] = request
 
             self._update.set()
             self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
             self._timer.start()
             self._lock.release()
 
-    def set_phase_off(self, pin:int, user:str):
+    def set_phase_off(self, request:TC_phase_request):
         """
         Sets the state of pin to off
         :param pin:
         :return: None
         """
-        if pin in self._valid_pins:
+        if request.num in self._valid_pins:
             self._lock.acquire()
-            phase_queue = self._phase_queues[pin]
-            if user in phase_queue:
+            phase_queue = self._phase_queues[request.num]
+            if request.user in phase_queue:
                 self._timer.cancel()
-                del phase_queue[user]
+                del phase_queue[request.user]
                 self._update.set()
                 self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
                 self._timer.start()
@@ -658,7 +735,8 @@ class Server (TC):
         self.mqttc = mqtt.Client(controller_id)
 
         # Separate thread to manage TC relays
-        self._relays = TC_Relay(self.phase_to_gpio.values())
+        self._relays = TC_Relay(self, self.phase_to_gpio.values())
+        self._pending = TC_Pending(self)
 
         # using password until we can get TLS setup with user certificates
         #self.mqttc.username_pw_set(self.id)
@@ -705,6 +783,7 @@ class Server (TC):
 
         # enter network loop forever, relying on interrupt handler to stop things
         self._relays.start()
+        self._pending.start()
         self.mqttc.loop_forever()
 
     def stop(self):
@@ -716,7 +795,10 @@ class Server (TC):
         msg = "stopping TC Server for controller %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.disconnect()
-        if self._relays.isAlive:
+        if self._pending.isAlive():
+            self._pending.stop()
+            self._pending.join()
+        if self._relays.isAlive():
             self._relays.stop()
             self._relays.join()
 
@@ -730,14 +812,8 @@ class Server (TC):
         if request.phase in self.phases:
             msg = "processing request type %d for phase %d from %s in %d seconds" % (request.type, request.phase, request.id, request.arrival_time)
             self.output_log(msg)
-            if request.type == TC.PHASE_REQUEST_ON:
-                self._relays.set_phase_on(self.phase_to_gpio[request.phase], request.id)
-                msg = "set phase %d to on for %s" % (request.phase, request.id)
-                self.output_log(msg)
-            elif request.type == TC.PHASE_REQUEST_OFF:
-                self._relays.set_phase_off(self.phase_to_gpio[request.phase], request.id)
-                msg = "set phase %d to off for %s" % (request.phase, request.id)
-                self.output_log(msg)
+            relay_request = TC_phase_request(self.phase_to_gpio[request.phase], request.id, request.arrival_time, request.type)
+            self._pending.add_request(relay_request)
         else:
             msg = "received an invalid phase number %d" % (request.phase,)
             self.output_error(msg)
