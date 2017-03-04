@@ -605,6 +605,9 @@ class TC_Pending(threading.Thread):
         :return: None
         """
         self.runnable = False
+        if self._timer:
+            self._timer.cance()
+        self._event.set()
 
 
 
