@@ -528,7 +528,15 @@ class TC_Pending(threading.Thread):
         self._queue = dict()
         self._runnable = True
         self._lock = threading.Lock()
+        self._timer = None
+        self._event = threading.Event()
         self._interval = TC.CHECK_PENDING_INTERVAL
+
+    def _trigger(self):
+        """
+        Called by timer to clear event
+        """
+        self._event.clear()
 
     def run(self):
         """
@@ -549,8 +557,10 @@ class TC_Pending(threading.Thread):
                         msg = "executing %s request for phase %d release" % (request.user, request.num)
                         self._parent._relays.set_phase_off(request)
                     self._parent.output_log(msg)
+            self._timer = threading.Timer(self._interval, self._trigger)
+            self._timer.start()
             self._lock.release()
-            sleep(self._interval)
+            self._event.wait()
 
     def add_request(self, request:TC_phase_request):
         """
@@ -560,6 +570,10 @@ class TC_Pending(threading.Thread):
         """
 
         if request.arrival_time == 0:
+            # remove any pending reqeusts for this user
+            if request.user in self._queue:
+                del self._queue[request.user]
+
             if request.op == TC.PHASE_REQUEST_ON:
                 self._parent._relays.set_phase_on(request)
                 msg = "executing %s request for phase %d on" % (request.user, request.num)
