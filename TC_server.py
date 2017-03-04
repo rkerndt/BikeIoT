@@ -603,7 +603,7 @@ class TC_Pending(threading.Thread):
         Sets runnable to False causing loop to exit at next interation
         :return: None
         """
-        self.runnable = False
+        self._runnable = False
         if self._timer:
             self._timer.cancel()
         self._event.set()
