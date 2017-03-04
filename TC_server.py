@@ -522,7 +522,7 @@ class TC_Pending(threading.Thread):
     zero seconds call is made to TC_Relay
     """
 
-    def __init__(self, parent:Server):
+    def __init__(self, parent:TC_server.Server):
         super().__init__()
         self._parent = parent
         self._queue = dict()
