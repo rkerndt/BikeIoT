@@ -578,8 +578,6 @@ class TC_Pending(threading.Thread):
                 self._parent._relays.set_phase_on(request)
                 msg = "executing %s request for phase %d on" % (request.user, request.num)
             else:
-                if request.user in self._queue:
-                    del self._queue[request.user]
                 self._parent._relays.set_phase_off(request)
                 msg = "executing %s request for phase %d release" % (request.user, request.num)
             self._parent.output_log(msg)
@@ -686,7 +684,8 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         self._runnable = False
-        self._timer.cancel()
+        if self._timer:
+            self._timer.cancel()
         self._update.set()
 
 
