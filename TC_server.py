@@ -561,6 +561,7 @@ class TC_Pending(threading.Thread):
             self._timer.start()
             self._lock.release()
             self._event.wait()
+            self._event.clear()
 
     def add_request(self, request:TC_phase_request):
         """
