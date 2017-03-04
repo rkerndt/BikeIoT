@@ -564,14 +564,20 @@ class TC_Pending(threading.Thread):
                 self._parent._relays.set_phase_on(request)
                 msg = "executing %s request for phase %d on" % (request.user, request.num)
             else:
+                if request.user in self._queue:
+                    del self._queue[request.user]
                 self._parent._relays.set_phase_off(request)
                 msg = "executing %s request for phase %d release" % (request.user, request.num)
             self._parent.output_log(msg)
         else:
             self._lock.acquire()
             if request.user in self._queue:
-                self._queue[request.user].arrival_time = request.arrival_time
-                msg = "updating %s arrival time to %d" % (request.user, request.arrival_time)
+                if self._queue[request.user].op == request.op:
+                    self._queue[request.user].arrival_time = request.arrival_time
+                    msg = "updating %s arrival time to %d" % (request.user, request.arrival_time)
+                else:
+                    self._queue[request.user] = request
+                    msg = "replaced %s with request type %d for arrival in %d" % (request.user, request.op, request.arrival_time)
             else:
                 self._queue[request.user] = request
                 msg = "adding request from %s for phase %d op %d to pending" % (request.user, request.num, request.op)
