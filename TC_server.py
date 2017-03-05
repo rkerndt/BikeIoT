@@ -845,7 +845,7 @@ class Server (TC):
         if request.phase in self.phases:
             msg = "processing request type %d for phase %d from %s in %d seconds" % (request.type, request.phase, request.id, request.arrival_time)
             self.output_log(msg)
-            relay_request = TC_phase_request(self.request.phase, request.id, request.arrival_time, request.type)
+            relay_request = TC_phase_request(request.phase, request.id, request.arrival_time, request.type)
             self._pending.add_request(relay_request)
         else:
             msg = "received an invalid phase number %d" % (request.phase,)
