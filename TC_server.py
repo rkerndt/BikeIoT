@@ -652,12 +652,12 @@ class TC_Relay(threading.Thread):
         :param pin:
         :return: None
         """
-        request.num = self._parent.phase_to_gpio[request.num]
+        pin_num = self._parent.phase_to_gpio[request.num]
         if request.num in self._valid_pins:
             self._lock.acquire()
             self._timer.cancel()
 
-            phase_queue = self._phase_queues[request.num]
+            phase_queue = self._phase_queues[pin_num]
             if request.user in phase_queue:
                 phase_queue[request.user].timestamp = datetime.now()
             else:
@@ -675,10 +675,10 @@ class TC_Relay(threading.Thread):
         :param pin:
         :return: None
         """
-        request.num = self._parent.phase_to_gpio[request.num]
+        pin_num = self._parent.phase_to_gpio[request.num]
         if request.num in self._valid_pins:
             self._lock.acquire()
-            phase_queue = self._phase_queues[request.num]
+            phase_queue = self._phase_queues[pin_num]
             if request.user in phase_queue:
                 self._timer.cancel()
                 del phase_queue[request.user]
