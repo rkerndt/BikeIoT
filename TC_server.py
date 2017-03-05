@@ -71,13 +71,15 @@ class TC:
     _bind_address = "100.81.111.18"
     _default_phase_map = { 1:2, 2:3, 3:4, 4:5 }
     _phase_dwell = 0.1
+    _debug_level = 1
 
     # general payload formats
     _payload_type_format = '!i'
     _payload_type_length = struct.calcsize(_payload_type_format)
 
     def __init__(self):
-        self.lock = threading.Lock()
+        #self.lock = threading.Lock()
+        self.debug_level = TC._debug_level
 
     def output_msg(self, msg:str, stream):
         """
@@ -177,12 +179,13 @@ class TC:
         :param rc: int connection result
         :return: None
         """
-        msg = TC.CONNACK_LOOKUP[rc]
-        if rc == mqtt.CONNACK_ACCEPTED:
-            userdata.output_log(msg)
-        else:
-            userdata.output_log(msg)
-            userdata.stop()
+        if userdata.debug_level > 0:
+            msg = TC.CONNACK_LOOKUP[rc]
+            if rc == mqtt.CONNACK_ACCEPTED:
+                userdata.output_log(msg)
+            else:
+                userdata.output_log(msg)
+                userdata.stop()
 
 
     @staticmethod
@@ -210,8 +213,9 @@ class TC:
         :param mqtt_msg: MQTTMessage
         :return: None
         """
-        msg = "received message id %d" % (mqtt_msg.mid,)
-        userdata.output_log(msg)
+        if userdata.debug_level > 0:
+            msg = "received message id %d" % (mqtt_msg.mid,)
+            userdata.output_log(msg)
 
     @staticmethod
     def on_publish(client, userdata, mqtt_mid):
@@ -227,8 +231,9 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
-        msg = "published message id %d" % (mqtt_mid,)
-        userdata.output_log(msg)
+        if userdata.debug_level > 0:
+            msg = "published message id %d" % (mqtt_mid,)
+            userdata.output_log(msg)
 
     @staticmethod
     def on_subscribe(client, userdata, mqtt_mid, granted_qos):
@@ -241,8 +246,9 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
-        msg = "subscribe granted for message %d with qos %s" % (mqtt_mid, str(granted_qos))
-        userdata.output_log(msg)
+        if userdata.debug_level > 0:
+            msg = "subscribe granted for message %d with qos %s" % (mqtt_mid, str(granted_qos))
+            userdata.output_log(msg)
 
     @staticmethod
     def on_unsubscribe(client, userdata, mqtt_mid):
@@ -646,6 +652,7 @@ class TC_Relay(threading.Thread):
         :param pin:
         :return: None
         """
+        request.num = self._parent._phase_to_gpio[request.num]
         if request.num in self._valid_pins:
             self._lock.acquire()
             self._timer.cancel()
@@ -668,6 +675,7 @@ class TC_Relay(threading.Thread):
         :param pin:
         :return: None
         """
+        request.num = self._parent._phase_to_gpio[request.num]
         if request.num in self._valid_pins:
             self._lock.acquire()
             phase_queue = self._phase_queues[request.num]
@@ -820,12 +828,10 @@ class Server (TC):
         self.output_log(msg)
         self.mqttc.disconnect()
         if self._pending.isAlive():
-            msg = "stopping pending queue"
             self.output_log(msg)
             self._pending.stop()
             self._pending.join()
         if self._relays.isAlive():
-            msg = "stopping relays"
             self._relays.stop()
             self._relays.join()
 
@@ -839,7 +845,7 @@ class Server (TC):
         if request.phase in self.phases:
             msg = "processing request type %d for phase %d from %s in %d seconds" % (request.type, request.phase, request.id, request.arrival_time)
             self.output_log(msg)
-            relay_request = TC_phase_request(self.phase_to_gpio[request.phase], request.id, request.arrival_time, request.type)
+            relay_request = TC_phase_request(self.request.phase, request.id, request.arrival_time, request.type)
             self._pending.add_request(relay_request)
         else:
             msg = "received an invalid phase number %d" % (request.phase,)
@@ -898,6 +904,7 @@ class User(TC):
         self.id = user_id
         self.mqttc = mqtt.Client(user_id)
         self.qos = TC.DEFAULT_QOS
+
         # using password until we can get TLS setup with user certificates
         #self.mqttc.username_pw_set(self.id)
 
