@@ -920,7 +920,9 @@ class Server (TC):
                 userdata.request_phase(request)
             else:
                 # try decoding as a json encoded string
-                request = TC_Request.json_load(StringIO(str(mqtt_msg.payload)))
+                payload_string = mqtt_msg.payload.decode("utf-8")
+                payload_stream = StringIO(payload_string)
+                request = TC_Request.json_load(payload_stream)
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
