@@ -438,7 +438,15 @@ class TC_Request(TC_Identifier):
         :param fs:
         :return: None
         """
-        json.dump(self, fs)
+
+        # fist stuff object attributes into a dictionary
+        json_dict = {}
+        json_dict['type'] = self.type
+        json_dict['id'] = self.id
+        json_dict['controller_id'] = self.controller_id
+        json_dict['phase'] =self.phase
+        json_dict['arrival_time'] = self.arrival_time
+        json.dump(json_dict, fs)
 
     @classmethod
     def json_load(cls, fs):
@@ -911,7 +919,7 @@ class Server (TC):
                 userdata.request_phase(request)
             else:
                 # try decoding as a json encoded string
-                request = TC_Request.json_load(StringIO(mqtt_msg.payload))
+                request = TC_Request.json_load(StringIO(str(mqtt_msg.payload)))
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
