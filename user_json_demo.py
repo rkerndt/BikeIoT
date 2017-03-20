@@ -35,9 +35,9 @@ while True:
             good = False
         if good:
             if op == 'on':
-                myUser.send_json_request(controllerID, phase, arrival)
+                myUser.send_json_phase_request(controllerID, phase, arrival)
             elif op == 'off':
-                myUser.send_json_release(controllerID, phase, arrival)
+                myUser.send_json_phase_release(controllerID, phase, arrival)
             else:
                 good = False
         if not good:
