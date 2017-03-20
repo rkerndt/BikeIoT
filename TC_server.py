@@ -53,6 +53,7 @@ class TC:
     PHASE_OFF = 0x00
 
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
+    TC_REQUEST_LENGTH = 5
 
     # CONNACK codes: returned in rc of on_connect
     CONNACK_LOOKUP = {mqtt.CONNACK_ACCEPTED:'successful connection',
@@ -1017,6 +1018,7 @@ class User(TC):
         self.output_log(msg)
         payload = StringIO()
         request.json_dump(payload)
+        print("json encoding = %s" % payload.getvalue())
         self.mqttc.publish(topic, payload.getvalue(), self.qos)
 
     def send_phase_release(self, controller_id:str, phase:int, departure_time:int=0):
