@@ -923,6 +923,7 @@ class Server (TC):
                 payload_string = mqtt_msg.payload.decode("utf-8")
                 payload_stream = StringIO(payload_string)
                 request = TC_Request.json_load(payload_stream)
+                userdata.request_phase(request)
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
