@@ -17,6 +17,8 @@ import threading
 from time import sleep
 import signal
 import socket
+from io import StringIO
+import json
 
 class TC_Exception (Exception):
     """
@@ -281,7 +283,7 @@ class TC_Type:
     _struct_format = '!i'
     _struct_size = struct.calcsize(_struct_format)
 
-    def __init__(self, type):
+    def __init__(self, type:int):
         """
         No reason to create this base type, use decode() to obtain type value from a derived class. But, this
         would be better done using get_type() method in class TC.
@@ -430,6 +432,40 @@ class TC_Request(TC_Identifier):
 
         return TC_Request(user_id, controller_id, phase, arrival_time)
 
+    def json_dump(self, fs):
+        """
+        Encodes TC_Request object into a JSON string and writes to fs (stream object)
+        :param fs:
+        :return: None
+        """
+        json.dump(self, fs)
+
+    @classmethod
+    def json_load(cls, fs):
+        """
+        Creates a TC_Request Object from a JSON string stream
+        :param fs:
+        :return: TC_Request
+        """
+
+        json_dict = json.load(fs)
+
+        # validate dictionary and then create TC_Request Object
+        if len(json_dict) != TC.TC_REQUEST_LENGTH:
+            msg = "JSON encoding contains %d elements when expecting %d" % (len(json_dict), TC.TC_REQUEST_LENGTH)
+            raise TC_Exception(msg)
+        try:
+            type = int(json_dict['type'])
+            id = json_dict['id']
+            controller_id = json_dict['controller_id']
+            phase = int(json_dict['phase'])
+            arrival_time = int(json_dict['arrival_time'])
+            new_tc_reqeust = TC_Request(id, controller_id, phase, arrival_time)
+            new_tc_reqeust.type = type
+            return new_tc_reqeust
+        except:
+            msg = "Malformed TC_Request Encoding: %s" % (str(json_dict),)
+            raise TC_Exception(msg)
 
 class TC_Request_On(TC_Request):
     """
@@ -874,8 +910,8 @@ class Server (TC):
                 request = TC_Request_Off.decode(mqtt_msg.payload)
                 userdata.request_phase(request)
             else:
-                msg = "received payload of type %d but expecting %d" % (request_type, TC.PHASE_REQUEST)
-                userdata.output_error(msg)
+                # try decoding as a json encoded string
+                request = TC_Request.json_load(StringIO(mqtt_msg.payload))
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
@@ -959,6 +995,22 @@ class User(TC):
         self.output_log(msg)
         self.mqttc.publish(topic, request.encode(), self.qos)
 
+    def send_json_phase_request(self, controller_id:str, phase:int, arrival_time:int=0):
+        """
+        Creates a TC_Request_On object and publishes on the appropriate topic
+        :param controller_id: str
+        :param phase: int
+        :param arrival_time: int
+        :return: None
+        """
+        request = TC_Request_On(self.id, controller_id, phase, arrival_time)
+        topic = TC._tc_topic_format % controller_id
+        msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, arrival_time)
+        self.output_log(msg)
+        payload = StringIO()
+        request.json_dump(payload)
+        self.mqttc.publish(topic, payload.getvalue(), self.qos)
+
     def send_phase_release(self, controller_id:str, phase:int, departure_time:int=0):
         """
         Creates a TC_Reqeust_Off object and publishes on the appropriate topic
@@ -972,6 +1024,22 @@ class User(TC):
         msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, departure_time)
         self.output_log(msg)
         self.mqttc.publish(topic, request.encode(), self.qos)
+
+    def send_json_phase_release(self, controller_id:str, phase:int, departure_time:int=0):
+        """
+        Creates a TC_Reqeust_Off object and publishes on the appropriate topic
+        :param controller_id:
+        :param phase:
+        :param departure_time:
+        :return: None
+        """
+        request = TC_Request_Off(self.id, controller_id, phase, departure_time)
+        topic = TC._tc_topic_format % controller_id
+        msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, departure_time)
+        self.output_log(msg)
+        payload = StringIO()
+        request.json_dump(payload)
+        self.mqttc.publish(topic, payload.getvalue(), self.qos)
 
 def main(argv):
     """
