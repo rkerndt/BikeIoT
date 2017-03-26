@@ -450,14 +450,12 @@ class TC_Request(TC_Identifier):
         json.dump(json_dict, fs)
 
     @classmethod
-    def json_load(cls, fs):
+    def json_load(cls, json_dict):
         """
         Creates a TC_Request Object from a JSON string stream
         :param fs:
         :return: TC_Request
         """
-
-        json_dict = json.load(fs)
 
         # validate dictionary and then create TC_Request Object
         if len(json_dict) != TC.TC_REQUEST_LENGTH:
@@ -920,12 +918,30 @@ class Server (TC):
                 userdata.request_phase(request)
             else:
                 # try decoding as a json encoded string
-                payload_string = mqtt_msg.payload.decode("utf-8")
-                payload_stream = StringIO(payload_string)
-                request = TC_Request.json_load(payload_stream)
+                request = Server.decode_json(mqtt_msg)
                 userdata.request_phase(request)
         except TC_Exception as err:
             userdata.output_error(err.msg)
+
+    @staticmethod
+    def decode_json(mqtt_msg:mqtt.MQTTMessage):
+        """
+        Decodes into a dictionary checks whether "type" key is present and then passes onto appropriate TC request class
+        for validation and decoding.
+
+        :param payload: JSON dictionary encoding
+        :return: TC_type derived class
+        """
+        payload_string = mqtt_msg.payload.decode("utf-8")
+        payload_stream = StringIO(payload_string)
+        payload_dict = json.load(payload_stream)
+        if "type" in payload_dict:
+            type = payload_dict["type"]
+            if type == TC.PHASE_REQUEST_ON or type == TC.PHASE_REQUEST_OFF:
+                request = TC_Request.json_load(payload_dict)
+            else:
+                raise TC_Exception("Unrecognized message type (%d)" % (type,))
+            return request
 
     def signal_handler(self, signum, frame):
         """
