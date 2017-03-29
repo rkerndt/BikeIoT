@@ -10,8 +10,8 @@ myBroker = input("Please enter broker url: ")
 controllerID = 'beacon_1.cs.uoregon.edu'
 
 myUser = TC_server.User(myUserID)
-myUser.debug_level = 1
-myUser._broker_url = "julie.eug.kerndt.com"
+myUser.debug_level = 0
+myUser._broker_url =  myBroker
 myUser.start()
 
 
