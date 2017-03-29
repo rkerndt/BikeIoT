@@ -813,7 +813,7 @@ class Server (TC):
         self._pending = TC_Pending(self)
 
         # using password until we can get TLS setup with user certificates
-        #self.mqttc.username_pw_set(self.id)
+        self.mqttc.username_pw_set(self.id, password="BikeIoT")
 
         # pass reference to self for use in callbacks
         self.mqttc.user_data_set(self)
@@ -852,6 +852,15 @@ class Server (TC):
                 connection_retry_delay *= TC.CONNECTION_RETRY_FACTOR
                 if connection_retry_delay > TC.MAX_CONNECTION_RETRY_DELAY:
                     connection_retry_delay = TC.MAX_CONNECTION_RETRY_DELAY
+            except (ConnectionError, ConnectionRefusedError, ConnectionAbortedError, ConnectionResetError) as e:
+                error_int, error_string = e.args
+                msg = "aborted due to connection error (%d) (%s)" % (error_int, error_string)
+                self.output_error(msg)
+                exit(error_int)
+            except:
+                msg = "aborted with unkown error"
+                self.output_error(msg)
+                exit(1)
 
         # subscribe to own controller_id topic and will topic to get messages intended for me
         self.mqttc.subscribe([(self.tc_topic, TC._qos), (TC._will_topic, TC._qos)])
