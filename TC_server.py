@@ -979,7 +979,7 @@ class User(TC):
         self.qos = TC.DEFAULT_QOS
 
         # using password until we can get TLS setup with user certificates
-        #self.mqttc.username_pw_set(self.id)
+        self.mqttc.username_pw_set(self.id, password="BikeIoT")
 
         # pass reference to self for use in callbacks
         self.mqttc.user_data_set(self)
@@ -999,10 +999,10 @@ class User(TC):
         terminate loop.
         :return: None
         """
-        self.mqttc.connect(TC._broker_url, TC._broker_port, TC._broker_keepalive)
+        self.mqttc.connect(self._broker_url, self._broker_port, self._broker_keepalive)
 
         # subscribe to will topic to get messages intended for me
-        self.mqttc.subscribe(TC._will_topic, TC._qos)
+        self.mqttc.subscribe(self._will_topic, self._qos)
 
 
         # start network loop
