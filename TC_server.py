@@ -600,10 +600,10 @@ class TC_Pending(threading.Thread):
                 if request.arrival_time <= 0:
                     del self._queue[user]
                     if request.op == TC.PHASE_REQUEST_ON:
-                        msg = "executing %s request for phase %d on from pending queue" % (request.user, request.num)
+                        msg = "executed %s request for phase %d on from pending queue" % (request.user, request.num)
                         self._parent._relays.set_phase_on(request)
                     else:
-                        msg = "executing %s request for phase %d release from pending queue" % (request.user, request.num)
+                        msg = "executed %s request for phase %d release from pending queue" % (request.user, request.num)
                         self._parent._relays.set_phase_off(request)
                     self._parent.output_log(msg)
             self._timer = threading.Timer(self._interval, self._trigger)
@@ -619,11 +619,12 @@ class TC_Pending(threading.Thread):
         :return: None
         """
 
+        msg = ""
         if request.arrival_time == 0:
             # remove any pending reqeusts for this user
             if request.user in self._queue:
                 del self._queue[request.user]
-                msg = "removing user %s from pending queue" % request.user
+                msg = "removing user %s from pending queue" % (request.user,)
             if request.op == TC.PHASE_REQUEST_ON:
                 self._parent._relays.set_phase_on(request)
                 msg = "executed %s request for phase %d on" % (request.user, request.num)
@@ -643,9 +644,8 @@ class TC_Pending(threading.Thread):
             else:
                 self._queue[request.user] = request
                 msg = "adding request from %s for phase %d op %d to pending" % (request.user, request.num, request.op)
-            self._parent.output_log(msg)
             self._lock.release()
-
+        self._parent.output_log(msg)
 
     def stop(self):
         """
@@ -695,6 +695,7 @@ class TC_Relay(threading.Thread):
         :param pin:
         :return: None
         """
+        msg = ""
         pin_num = self._parent.phase_to_gpio[request.num]
         if pin_num in self._valid_pins:
             self._lock.acquire()
@@ -709,10 +710,10 @@ class TC_Relay(threading.Thread):
                 phase_queue[request.user] = request
                 msg = "Adding user %s to phase %d (pin %d)" % (request.user, request.num, pin_num)
 
-            self._update.set()
             self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
             self._timer.start()
             self._lock.release()
+            self._update.set()
         else:
             msg = "Invalid pin %d associated with phase %d request from user %s" % (pin_num, request.num, request.user)
         self._parent.output_log(msg)
@@ -724,6 +725,7 @@ class TC_Relay(threading.Thread):
         :param pin:
         :return: None
         """
+        msg = ""
         pin_num = self._parent.phase_to_gpio[request.num]
         if pin_num in self._valid_pins:
             self._lock.acquire()
@@ -731,13 +733,13 @@ class TC_Relay(threading.Thread):
             if request.user in phase_queue:
                 self._timer.cancel()
                 del phase_queue[request.user]
-                msg = "Removing user %s from phase %d (pin %d) queue" %(request.user, request.num, pin_num)
-                self._update.set()
+                msg = "Removing user %s from phase %d (pin %d) queue" % (request.user, request.num, pin_num)
                 self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
                 self._timer.start()
             else:
                 msg = "User %s not in queue for phase %d (pin %d)" % (request.user, request.num, pin_num)
             self._lock.release()
+            self._update.set()
         else:
             msg = "Invalid pin %d associated with phase %d release from user %s" % (pin_num, request.num, request.user)
         self._parent.output_log(msg)
@@ -779,7 +781,7 @@ class TC_Relay(threading.Thread):
         Passes through phase queues making gpio calls to set relay to the corresponding phase
         :return: None
         """
-
+        msg = ""
         self._lock.acquire()
         self._update.clear()
         for pin, phase_queue in self._phase_queues.items():
