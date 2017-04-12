@@ -725,7 +725,7 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         pin_num = self._parent.phase_to_gpio[request.num]
-        if request.num in self._valid_pins:
+        if pin_num in self._valid_pins:
             self._lock.acquire()
             phase_queue = self._phase_queues[pin_num]
             if request.user in phase_queue:
