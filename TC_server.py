@@ -72,7 +72,7 @@ class TC:
     _broker_port = 1883
     _broker_keepalive = 60
     _bind_address = "100.81.111.18"
-    _default_phase_map = { 1:2, 2:3, 3:4, 4:5 }
+    _default_phase_map = { 1:2, 2:3, 3:4, 4:5 } # phase:pin
     _phase_dwell = 0.1
     _debug_level = 1
 
@@ -600,10 +600,10 @@ class TC_Pending(threading.Thread):
                 if request.arrival_time <= 0:
                     del self._queue[user]
                     if request.op == TC.PHASE_REQUEST_ON:
-                        msg = "executing %s request for phase %d on" % (request.user, request.num)
+                        msg = "executing %s request for phase %d on from pending queue" % (request.user, request.num)
                         self._parent._relays.set_phase_on(request)
                     else:
-                        msg = "executing %s request for phase %d release" % (request.user, request.num)
+                        msg = "executing %s request for phase %d release from pending queue" % (request.user, request.num)
                         self._parent._relays.set_phase_off(request)
                     self._parent.output_log(msg)
             self._timer = threading.Timer(self._interval, self._trigger)
@@ -623,7 +623,7 @@ class TC_Pending(threading.Thread):
             # remove any pending reqeusts for this user
             if request.user in self._queue:
                 del self._queue[request.user]
-
+                msg = "removing user %s from pending queue" % request.user
             if request.op == TC.PHASE_REQUEST_ON:
                 self._parent._relays.set_phase_on(request)
                 msg = "executing %s request for phase %d on" % (request.user, request.num)
@@ -703,14 +703,20 @@ class TC_Relay(threading.Thread):
             phase_queue = self._phase_queues[pin_num]
             if request.user in phase_queue:
                 phase_queue[request.user].timestamp = datetime.now()
+                msg = "Extending phase %d (pin %d) time for user %s " % (request.num, pin_num, request.user)
             else:
                 request.timestamp = datetime.now()
                 phase_queue[request.user] = request
+                msg = "Adding user %s to phase %d (pin %d)" % (request.user, request.num, pin_num)
 
             self._update.set()
             self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
             self._timer.start()
             self._lock.release()
+        else:
+            msg = "Invalid pin %d associated with phase %d request from user %s" % (pin_num, request.num, request.user)
+        self._parent.output_log(msg)
+
 
     def set_phase_off(self, request:TC_phase_request):
         """
@@ -725,10 +731,16 @@ class TC_Relay(threading.Thread):
             if request.user in phase_queue:
                 self._timer.cancel()
                 del phase_queue[request.user]
+                msg = "Removing user %s from phase %d (pin %d) queue" %(request.user, request.num, pin_num)
                 self._update.set()
                 self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
                 self._timer.start()
+            else:
+                msg = "User %s not in queue for phase %d (pin %d)" % (request.user, request.num, pin_num)
             self._lock.release()
+        else:
+            msg = "Invalid pin %d associated with phase %d release from user %s" % (pin_num, request.num, request.user)
+        self._parent.output_log(msg)
 
     def stop(self):
         """
@@ -775,6 +787,7 @@ class TC_Relay(threading.Thread):
                 # turn off if exceed max time
                 if (datetime.now() - phase_request.timestamp) > self._max_delta_time:
                     del phase_queue[phase_request.user]
+                    msg = "User %s timeout in phase %d (pin %d)" % (phase_request.user, phase_queue, pin)
 
             # TODO: check against actual gpio pin state rather than just setting
             # TODO: also need to add confirmation that write was successful
@@ -783,6 +796,7 @@ class TC_Relay(threading.Thread):
                 value = 1
             grovepi.digitalWrite(pin, value)
         self._lock.release()
+        self._parent.output_log(msg)
 
 class Server (TC):
     """
