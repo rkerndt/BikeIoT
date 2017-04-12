@@ -74,7 +74,7 @@ class TC:
     _bind_address = "100.81.111.18"
     _default_phase_map = { 1:2, 2:3, 3:4, 4:5 } # phase:pin
     _phase_dwell = 0.1
-    _debug_level = 1
+    _debug_level = 2
 
     # general payload formats
     _payload_type_format = '!i'
@@ -786,11 +786,15 @@ class TC_Relay(threading.Thread):
         self._update.clear()
         for pin, phase_queue in self._phase_queues.items():
             for phase_request in list(phase_queue.values()):
+                msg = ""
+                delta_time = datetime.now() - phase_request.timestamp
+                if self._parent.debug_leve > 1:
+                    msg = "User %s has %d seconds remaining" % (phase_request.user, delta_time.seconds())
                 # turn off if exceed max time
-                if (datetime.now() - phase_request.timestamp) > self._max_delta_time:
+                if delta_time > self._max_delta_time:
                     del phase_queue[phase_request.user]
                     msg = "User %s timeout in phase %d (pin %d)" % (phase_request.user, phase_queue, pin)
-
+                self._parent.output(msg)
             # TODO: check against actual gpio pin state rather than just setting
             # TODO: also need to add confirmation that write was successful
             value = 0
@@ -798,7 +802,6 @@ class TC_Relay(threading.Thread):
                 value = 1
             grovepi.digitalWrite(pin, value)
         self._lock.release()
-        self._parent.output_log(msg)
 
 class Server (TC):
     """
