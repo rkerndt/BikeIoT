@@ -788,7 +788,7 @@ class TC_Relay(threading.Thread):
             for phase_request in list(phase_queue.values()):
                 msg = ""
                 delta_time = datetime.now() - phase_request.timestamp
-                if self._parent.debug_leve > 1:
+                if self._parent.debug_level > 1:
                     msg = "User %s has %d seconds remaining" % (phase_request.user, delta_time.seconds())
                 # turn off if exceed max time
                 if delta_time > self._max_delta_time:
