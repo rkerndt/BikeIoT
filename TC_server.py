@@ -626,10 +626,10 @@ class TC_Pending(threading.Thread):
                 msg = "removing user %s from pending queue" % request.user
             if request.op == TC.PHASE_REQUEST_ON:
                 self._parent._relays.set_phase_on(request)
-                msg = "executing %s request for phase %d on" % (request.user, request.num)
+                msg = "executed %s request for phase %d on" % (request.user, request.num)
             else:
                 self._parent._relays.set_phase_off(request)
-                msg = "executing %s request for phase %d release" % (request.user, request.num)
+                msg = "executed %s request for phase %d release" % (request.user, request.num)
             self._parent.output_log(msg)
         else:
             self._lock.acquire()
@@ -696,7 +696,7 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         pin_num = self._parent.phase_to_gpio[request.num]
-        if request.num in self._valid_pins:
+        if pin_num in self._valid_pins:
             self._lock.acquire()
             self._timer.cancel()
 
@@ -823,7 +823,7 @@ class Server (TC):
         self.mqttc = mqtt.Client(controller_id)
 
         # Separate thread to manage TC relays
-        self._relays = TC_Relay(self, self.phase_to_gpio.values())
+        self._relays = TC_Relay(self, list(self.phase_to_gpio.values()))
         self._pending = TC_Pending(self)
 
         # using password until we can get TLS setup with user certificates
