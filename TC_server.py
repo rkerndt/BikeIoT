@@ -703,12 +703,12 @@ class TC_Relay(threading.Thread):
                 delta_time = datetime.now() - phase_request.timestamp
                 if self._parent.debug_level > 1:
                     remaining_time = self._max_delta_time.total_seconds() - delta_time.total_seconds()
-                    msg = "User %s has %d seconds remaining" % (phase_request.user, remaining_time)
+                    msg = "User %s has %d seconds remaining in phase %d" % (phase_request.user, remaining_time, phase_request.phase)
                     self._parent.output_log(msg)
                 # turn off if exceed max time
                 if delta_time > self._max_delta_time:
                     del phase_queue[phase_request.user]
-                    msg = "User %s timeout in phase %d (pin %d)" % (phase_request.user, phase_request.num, pin)
+                    msg = "User %s timeout in phase %d (pin %d)" % (phase_request.user, phase_request.phase, pin)
                     self._parent.output_log(msg)
             # TODO: check against actual gpio pin state rather than just setting
             # TODO: also need to add confirmation that write was successful
