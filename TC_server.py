@@ -600,12 +600,13 @@ class TC_Pending(threading.Thread):
                 if request.arrival_time <= 0:
                     del self._queue[user]
                     if request.op == TC.PHASE_REQUEST_ON:
-                        msg = "executed %s request for phase %d on from pending queue" % (request.user, request.num)
+                        msg = "executing %s request for phase %d on from pending queue" % (request.user, request.num)
+                        self._parent.output_log(msg)
                         self._parent._relays.set_phase_on(request)
                     else:
-                        msg = "executed %s request for phase %d release from pending queue" % (request.user, request.num)
+                        msg = "executing %s request for phase %d release from pending queue" % (request.user, request.num)
+                        self._parent.output_log(msg)
                         self._parent._relays.set_phase_off(request)
-                    self._parent.output_log(msg)
             self._timer = threading.Timer(self._interval, self._trigger)
             self._timer.start()
             self._lock.release()
@@ -623,29 +624,34 @@ class TC_Pending(threading.Thread):
         if request.arrival_time == 0:
             # remove any pending reqeusts for this user
             if request.user in self._queue:
-                del self._queue[request.user]
                 msg = "removing user %s from pending queue" % (request.user,)
+                self._parent.output_log(msg)
+                del self._queue[request.user]
             if request.op == TC.PHASE_REQUEST_ON:
-                self._parent._relays.set_phase_on(request)
                 msg = "executed %s request for phase %d on" % (request.user, request.num)
+                self._parent.output_log(msg)
+                self._parent._relays.set_phase_on(request)
             else:
-                self._parent._relays.set_phase_off(request)
                 msg = "executed %s request for phase %d release" % (request.user, request.num)
-            self._parent.output_log(msg)
+                self._parent.output_log(msg)
+                self._parent._relays.set_phase_off(request)
         else:
             self._lock.acquire()
             if request.user in self._queue:
                 if self._queue[request.user].op == request.op:
-                    self._queue[request.user].arrival_time = request.arrival_time
                     msg = "updating %s arrival time to %d" % (request.user, request.arrival_time)
+                    self._parent.output_log(msg)
+                    self._queue[request.user].arrival_time = request.arrival_time
                 else:
-                    self._queue[request.user] = request
                     msg = "replaced %s with request type %d for arrival in %d" % (request.user, request.op, request.arrival_time)
+                    self._parent.output_log(msg)
+                    self._queue[request.user] = request
             else:
-                self._queue[request.user] = request
                 msg = "adding request from %s for phase %d op %d to pending" % (request.user, request.num, request.op)
+                self._parent.output_log(msg)
+                self._queue[request.user] = request
             self._lock.release()
-        self._parent.output_log(msg)
+
 
     def stop(self):
         """
@@ -703,12 +709,15 @@ class TC_Relay(threading.Thread):
 
             phase_queue = self._phase_queues[pin_num]
             if request.user in phase_queue:
-                phase_queue[request.user].timestamp = datetime.now()
                 msg = "Extending phase %d (pin %d) time for user %s " % (request.num, pin_num, request.user)
+                self._parent.output_log(msg)
+                phase_queue[request.user].timestamp = datetime.now()
+
             else:
                 request.timestamp = datetime.now()
-                phase_queue[request.user] = request
                 msg = "Adding user %s to phase %d (pin %d)" % (request.user, request.num, pin_num)
+                self._parent.output_log(msg)
+                phase_queue[request.user] = request
 
             self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
             self._timer.start()
@@ -716,7 +725,7 @@ class TC_Relay(threading.Thread):
             self._update.set()
         else:
             msg = "Invalid pin %d associated with phase %d request from user %s" % (pin_num, request.num, request.user)
-        self._parent.output_log(msg)
+            self._parent.output_log(msg)
 
 
     def set_phase_off(self, request:TC_phase_request):
@@ -732,17 +741,19 @@ class TC_Relay(threading.Thread):
             phase_queue = self._phase_queues[pin_num]
             if request.user in phase_queue:
                 self._timer.cancel()
-                del phase_queue[request.user]
                 msg = "Removing user %s from phase %d (pin %d) queue" % (request.user, request.num, pin_num)
+                self._parent.output_log(msg)
+                del phase_queue[request.user]
                 self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
                 self._timer.start()
             else:
                 msg = "User %s not in queue for phase %d (pin %d)" % (request.user, request.num, pin_num)
+                self._parent.output_log(msg)
             self._lock.release()
             self._update.set()
         else:
             msg = "Invalid pin %d associated with phase %d release from user %s" % (pin_num, request.num, request.user)
-        self._parent.output_log(msg)
+            self._parent.output_log(msg)
 
     def stop(self):
         """
@@ -790,11 +801,12 @@ class TC_Relay(threading.Thread):
                 delta_time = datetime.now() - phase_request.timestamp
                 if self._parent.debug_level > 1:
                     msg = "User %s has %d seconds remaining" % (phase_request.user, delta_time.total_seconds())
+                    self._parent.output_log(msg)
                 # turn off if exceed max time
                 if delta_time > self._max_delta_time:
                     del phase_queue[phase_request.user]
                     msg = "User %s timeout in phase %d (pin %d)" % (phase_request.user, phase_request.num, pin)
-                self._parent.output_log(msg)
+                    self._parent.output_log(msg)
             # TODO: check against actual gpio pin state rather than just setting
             # TODO: also need to add confirmation that write was successful
             value = 0
