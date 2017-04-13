@@ -43,12 +43,13 @@ class TC:
     PHASE_REQUEST =     0x01
     PHASE_REQUEST_ON =  0x02
     PHASE_REQUEST_OFF = 0x03
-    MAX_PHASE_ON_SECS = 0x60
+    MAX_PHASE_ON_SECS = 0x30
     CONNECTION_RETRY_FACTOR = 2
     INITIAL_CONNECTION_RETRY_DELAY = 0.1
     MAX_CONNECTION_RETRY_DELAY = 60
     DEFAULT_QOS = 2
     CHECK_PENDING_INTERVAL = 1
+    CHECK_PHASE_TIMEOUT_INTERVAL = 4
     PHASE_ON =  0x01
     PHASE_OFF = 0x00
 
@@ -690,7 +691,7 @@ class TC_Relay(threading.Thread):
         self._runnable = True
         self._lock = threading.Lock()
         self._update = threading.Event()
-        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/TC.CHECK_PHASE_TIMEOUT_INTERVAL, self._timeout)
 
         for pin in pins:
             self._phase_queues[pin] = dict()
@@ -719,7 +720,7 @@ class TC_Relay(threading.Thread):
                 self._parent.output_log(msg)
                 phase_queue[request.user] = request
 
-            self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+            self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/TC.CHECK_PHASE_TIMEOUT_INTERVAL, self._timeout)
             self._timer.start()
             self._lock.release()
             self._update.set()
@@ -744,7 +745,7 @@ class TC_Relay(threading.Thread):
                 msg = "Removing user %s from phase %d (pin %d) queue" % (request.user, request.num, pin_num)
                 self._parent.output_log(msg)
                 del phase_queue[request.user]
-                self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+                self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/TC.CHECK_PHASE_TIMEOUT_INTERVAL, self._timeout)
                 self._timer.start()
             else:
                 msg = "User %s not in queue for phase %d (pin %d)" % (request.user, request.num, pin_num)
@@ -784,7 +785,7 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         self._check_states()
-        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/2, self._timeout)
+        self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/TC.CHECK_PHASE_TIMEOUT_INTERVAL, self._timeout)
         self._timer.start()
 
     def _check_states(self):
@@ -800,7 +801,8 @@ class TC_Relay(threading.Thread):
                 msg = ""
                 delta_time = datetime.now() - phase_request.timestamp
                 if self._parent.debug_level > 1:
-                    msg = "User %s has %d seconds remaining" % (phase_request.user, delta_time.total_seconds())
+                    remaining_time = self._max_delta_time.total_seconds() - delta_time.total_seconds()
+                    msg = "User %s has %d seconds remaining" % (phase_request.user, remaining_time)
                     self._parent.output_log(msg)
                 # turn off if exceed max time
                 if delta_time > self._max_delta_time:
