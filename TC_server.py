@@ -550,7 +550,7 @@ class TC_Request_Off(TC_Request):
             msg = 'improperly formatted TC Request payload'
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
+        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
 
         if type != TC.PHASE_REQUEST_OFF:
             msg = 'payload claimed to be a phase request off but received code (%d)' % type
