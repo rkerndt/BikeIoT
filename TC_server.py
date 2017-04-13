@@ -368,21 +368,19 @@ class TC_Request(TC_Identifier):
     Structure and methods for manipulating mqtt payloads used in traffic control requests
     """
 
-    _struct_format = '!i%ds%dsii' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
+    _struct_format = '!i%ds%dsi' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
     _struct_size = struct.calcsize(_struct_format)
 
-    def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time:int=0):
+    def __init__(self, user_id: str, controller_id: str, phase: int):
         """
         Instantiates a Traffic Controller phase request
         :param user_id: str
         :param controller_id: str
         :param phase: int
-        :param arrival_time: int (Seconds until arrival)
         """
         super().__init__(TC.PHASE_REQUEST, user_id)
         self.controller_id = controller_id
         self.phase = phase
-        self.arrival_time = arrival_time
 
     def encode(self):
         """
@@ -394,7 +392,6 @@ class TC_Request(TC_Identifier):
             char user_id[TC.MAX_ID_BYTES];
             char controller_id[TC.MAX_ID_BYTES];
             int phase;
-            int arrival_time;
             } __attribute__((PACKED));
 
         :return: bytearray
@@ -407,8 +404,7 @@ class TC_Request(TC_Identifier):
         if len(controller_id_bytes) > TC.MAX_ID_BYTES:
             msg = "controller id <%s> exceeds %d utf-8 bytes" % (self.controller_id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        packed = struct.pack(TC_Request._struct_format, self.type, user_id_bytes, controller_id_bytes,
-                             self.phase,self.arrival_time)
+        packed = struct.pack(TC_Request._struct_format, self.type, user_id_bytes, controller_id_bytes, self.phase)
         return bytearray(packed)
 
     @classmethod
@@ -424,7 +420,7 @@ class TC_Request(TC_Identifier):
             msg = 'improperly formatted TC Request payload'
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
+        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
 
         if type != TC.PHASE_REQUEST:
             msg = 'payload claimed to be a phase request but received code (%d)' % type
@@ -432,7 +428,7 @@ class TC_Request(TC_Identifier):
         user_id = user_id_bytes.decode()
         controller_id = controller_id_bytes.decode()
 
-        return TC_Request(user_id, controller_id, phase, arrival_time)
+        return TC_Request(user_id, controller_id, phase)
 
     def json_dump(self, fs):
         """
@@ -447,7 +443,6 @@ class TC_Request(TC_Identifier):
         json_dict['id'] = self.id
         json_dict['controller_id'] = self.controller_id
         json_dict['phase'] =self.phase
-        json_dict['arrival_time'] = self.arrival_time
         json.dump(json_dict, fs)
 
     @classmethod
@@ -467,28 +462,40 @@ class TC_Request(TC_Identifier):
             id = json_dict['id']
             controller_id = json_dict['controller_id']
             phase = int(json_dict['phase'])
-            arrival_time = int(json_dict['arrival_time'])
-            new_tc_reqeust = TC_Request(id, controller_id, phase, arrival_time)
+            new_tc_reqeust = TC_Request(id, controller_id, phase)
             new_tc_reqeust.type = type
             return new_tc_reqeust
         except:
             msg = "Malformed TC_Request Encoding: %s" % (str(json_dict),)
             raise TC_Exception(msg)
 
+    def __str__(self):
+        """
+        Generates a human readable string suitable for logging
+        :return: str
+        """
+        if self.type == TC.PHASE_REQUEST_ON:
+            msg = "User %s requests phase %d on controller %s" % (self.id, self.phase, self.controller_id)
+        elif self.type == TC.PHASE_REQUEST_OFF:
+            msg = "User %s releases phase %d on controller %s" % (self.id, self.phase, self.controller_id)
+        else:
+            msg = "User %s sent request type %d to controller %s" % (self.id, self.phase, self.controller_id)
+        return msg
+
+
 class TC_Request_On(TC_Request):
     """
     TC_Request mqtt payload to set phase on
     """
 
-    def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time:int=0):
+    def __init__(self, user_id: str, controller_id: str, phase: int):
         """
 
         :param user_id:
         :param controller_id:
         :param phase:
-        :param arrival_time:
         """
-        super().__init__(user_id, controller_id, phase, arrival_time)
+        super().__init__(user_id, controller_id, phase)
         self.type = TC.PHASE_REQUEST_ON
 
     @classmethod
@@ -504,7 +511,7 @@ class TC_Request_On(TC_Request):
             msg = 'improperly formatted TC Request payload'
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase, arrival_time = struct.unpack(TC_Request._struct_format, payload)
+        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
 
         if type != TC.PHASE_REQUEST_ON:
             msg = 'payload claimed to be a phase request on but received code (%d)' % type
@@ -512,7 +519,7 @@ class TC_Request_On(TC_Request):
         user_id = user_id_bytes.decode()
         controller_id = controller_id_bytes.decode()
 
-        return TC_Request_On(user_id, controller_id, phase, arrival_time)
+        return TC_Request_On(user_id, controller_id, phase)
 
 
 class TC_Request_Off(TC_Request):
@@ -520,15 +527,14 @@ class TC_Request_Off(TC_Request):
     TC_Request mqtt payload to set phase on
     """
 
-    def __init__(self, user_id: str, controller_id: str, phase: int, arrival_time: int = 0):
+    def __init__(self, user_id: str, controller_id: str, phase: int):
         """
 
         :param user_id:
         :param controller_id:
         :param phase:
-        :param arrival_time:
         """
-        super().__init__(user_id, controller_id, phase, arrival_time)
+        super().__init__(user_id, controller_id, phase)
         self.type = TC.PHASE_REQUEST_OFF
 
     @classmethod
@@ -552,119 +558,17 @@ class TC_Request_Off(TC_Request):
         user_id = user_id_bytes.decode()
         controller_id = controller_id_bytes.decode()
 
-        return TC_Request_Off(user_id, controller_id, phase, arrival_time)
+        return TC_Request_Off(user_id, controller_id, phase)
 
 class TC_phase_request:
     """
-    State information we want to keep of a phase loop
+    State information we want to keep for a phase loop
     """
 
-    def __init__(self, pin_num:int, user:str, arrival_time:int, op=TC.PHASE_REQUEST_ON):
-        self.num = pin_num
+    def __init__(self, phase:int, user:str):
+        self.phase = phase
         self.timestamp = datetime.now()
         self.user = user
-        self.op = op
-        self.arrival_time = arrival_time
-
-class TC_Pending(threading.Thread):
-    """
-    Manages a queue of Traffic Controller phase requests which have non-zero arrival time. Once requests hit
-    zero seconds call is made to TC_Relay
-    """
-
-    def __init__(self, parent):
-        super().__init__()
-        self._parent = parent
-        self._queue = dict()
-        self._runnable = True
-        self._lock = threading.Lock()
-        self._timer = None
-        self._event = threading.Event()
-        self._interval = TC.CHECK_PENDING_INTERVAL
-
-    def _trigger(self):
-        """
-        Called by timer to clear event
-        """
-        self._event.set()
-
-    def run(self):
-        """
-        Loops at _interval seconds and decrements arrival_time for queued phase requests.
-        :return: None
-        """
-
-        while self._runnable:
-            self._lock.acquire()
-            for user, request in list(self._queue.items()):
-                request.arrival_time -= self._interval
-                if request.arrival_time <= 0:
-                    del self._queue[user]
-                    if request.op == TC.PHASE_REQUEST_ON:
-                        msg = "executing %s request for phase %d on from pending queue" % (request.user, request.num)
-                        self._parent.output_log(msg)
-                        self._parent._relays.set_phase_on(request)
-                    else:
-                        msg = "executing %s request for phase %d release from pending queue" % (request.user, request.num)
-                        self._parent.output_log(msg)
-                        self._parent._relays.set_phase_off(request)
-            self._timer = threading.Timer(self._interval, self._trigger)
-            self._timer.start()
-            self._lock.release()
-            self._event.wait()
-            self._event.clear()
-
-    def add_request(self, request:TC_phase_request):
-        """
-        Adds request to pending queue if arrival_time is non-zero, otherwise passes request onto relays
-        :param request:
-        :return: None
-        """
-
-        msg = ""
-        if request.arrival_time == 0:
-            # remove any pending reqeusts for this user
-            if request.user in self._queue:
-                msg = "removing user %s from pending queue" % (request.user,)
-                self._parent.output_log(msg)
-                del self._queue[request.user]
-            if request.op == TC.PHASE_REQUEST_ON:
-                msg = "executed %s request for phase %d on" % (request.user, request.num)
-                self._parent.output_log(msg)
-                self._parent._relays.set_phase_on(request)
-            else:
-                msg = "executed %s request for phase %d release" % (request.user, request.num)
-                self._parent.output_log(msg)
-                self._parent._relays.set_phase_off(request)
-        else:
-            self._lock.acquire()
-            if request.user in self._queue:
-                if self._queue[request.user].op == request.op:
-                    msg = "updating %s arrival time to %d" % (request.user, request.arrival_time)
-                    self._parent.output_log(msg)
-                    self._queue[request.user].arrival_time = request.arrival_time
-                else:
-                    msg = "replaced %s with request type %d for arrival in %d" % (request.user, request.op, request.arrival_time)
-                    self._parent.output_log(msg)
-                    self._queue[request.user] = request
-            else:
-                msg = "adding request from %s for phase %d op %d to pending" % (request.user, request.num, request.op)
-                self._parent.output_log(msg)
-                self._queue[request.user] = request
-            self._lock.release()
-
-
-    def stop(self):
-        """
-        Sets runnable to False causing loop to exit at next interation
-        :return: None
-        """
-        self._runnable = False
-        if self._timer:
-            self._timer.cancel()
-        self._event.set()
-
-
 
 
 class TC_Relay(threading.Thread):
@@ -703,20 +607,19 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         msg = ""
-        pin_num = self._parent.phase_to_gpio[request.num]
+        pin_num = self._parent.phase_to_gpio[request.phase]
         if pin_num in self._valid_pins:
             self._lock.acquire()
             self._timer.cancel()
 
             phase_queue = self._phase_queues[pin_num]
             if request.user in phase_queue:
-                msg = "Extending phase %d (pin %d) time for user %s " % (request.num, pin_num, request.user)
+                msg = "Extending phase %d (pin %d) time for user %s " % (request.phase, pin_num, request.user)
                 self._parent.output_log(msg)
                 phase_queue[request.user].timestamp = datetime.now()
-
             else:
                 request.timestamp = datetime.now()
-                msg = "Adding user %s to phase %d (pin %d)" % (request.user, request.num, pin_num)
+                msg = "Adding user %s to phase %d (pin %d)" % (request.user, request.phase, pin_num)
                 self._parent.output_log(msg)
                 phase_queue[request.user] = request
 
@@ -725,7 +628,7 @@ class TC_Relay(threading.Thread):
             self._lock.release()
             self._update.set()
         else:
-            msg = "Invalid pin %d associated with phase %d request from user %s" % (pin_num, request.num, request.user)
+            msg = "Invalid pin %d associated with phase %d request from user %s" % (pin_num, request.phase, request.user)
             self._parent.output_log(msg)
 
 
@@ -736,24 +639,24 @@ class TC_Relay(threading.Thread):
         :return: None
         """
         msg = ""
-        pin_num = self._parent.phase_to_gpio[request.num]
+        pin_num = self._parent.phase_to_gpio[request.phase]
         if pin_num in self._valid_pins:
             self._lock.acquire()
             phase_queue = self._phase_queues[pin_num]
             if request.user in phase_queue:
                 self._timer.cancel()
-                msg = "Removing user %s from phase %d (pin %d) queue" % (request.user, request.num, pin_num)
+                msg = "Removing user %s from phase %d (pin %d) queue" % (request.user, request.phase, pin_num)
                 self._parent.output_log(msg)
                 del phase_queue[request.user]
                 self._timer = threading.Timer(TC.MAX_PHASE_ON_SECS/TC.CHECK_PHASE_TIMEOUT_INTERVAL, self._timeout)
                 self._timer.start()
             else:
-                msg = "User %s not in queue for phase %d (pin %d)" % (request.user, request.num, pin_num)
+                msg = "User %s not in queue for phase %d (pin %d)" % (request.user, request.phase, pin_num)
                 self._parent.output_log(msg)
             self._lock.release()
             self._update.set()
         else:
-            msg = "Invalid pin %d associated with phase %d release from user %s" % (pin_num, request.num, request.user)
+            msg = "Invalid pin %d associated with phase %d release from user %s" % (pin_num, request.phase, request.user)
             self._parent.output_log(msg)
 
     def stop(self):
@@ -776,8 +679,6 @@ class TC_Relay(threading.Thread):
         while self._runnable:
             self._check_states()
             self._update.wait()
-
-
 
     def _timeout(self):
         """
@@ -843,7 +744,6 @@ class Server (TC):
 
         # Separate thread to manage TC relays
         self._relays = TC_Relay(self, list(self.phase_to_gpio.values()))
-        self._pending = TC_Pending(self)
 
         # using password until we can get TLS setup with user certificates
         self.mqttc.username_pw_set(self.id, password="BikeIoT")
@@ -900,7 +800,6 @@ class Server (TC):
 
         # enter network loop forever, relying on interrupt handler to stop things
         self._relays.start()
-        self._pending.start()
         self.mqttc.loop_forever()
 
     def stop(self):
@@ -912,10 +811,6 @@ class Server (TC):
         msg = "stopping TC Server for controller %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.disconnect()
-        if self._pending.isAlive():
-            self.output_log(msg)
-            self._pending.stop()
-            self._pending.join()
         if self._relays.isAlive():
             self._relays.stop()
             self._relays.join()
@@ -928,10 +823,17 @@ class Server (TC):
         """
 
         if request.phase in self.phases:
-            msg = "processing request type %d for phase %d from %s in %d seconds" % (request.type, request.phase, request.id, request.arrival_time)
-            self.output_log(msg)
-            relay_request = TC_phase_request(request.phase, request.id, request.arrival_time, request.type)
-            self._pending.add_request(relay_request)
+            if request.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
+                msg = "processing request type %d for phase %d from %s" % (request.type, request.phase, request.id)
+                self.output_log(msg)
+                relay_request = TC_phase_request(request.phase, request.id)
+                if request.type == TC.PHASE_REQUEST_ON:
+                    self._relays.set_phase_on(relay_request)
+                else:
+                    self._relays.set_phase_off(relay_request)
+            else:
+                msg = "received an invalid phase reqeust type %d" % (request.type,)
+                self.output_log(msg)
         else:
             msg = "received an invalid phase number %d" % (request.phase,)
             self.output_error(msg)
@@ -1051,7 +953,7 @@ class User(TC):
         self.mqttc.loop_stop()
         self.mqttc.disconnect()
 
-    def send_phase_request(self, controller_id:str, phase:int, arrival_time:int=0):
+    def send_phase_request(self, controller_id:str, phase:int):
         """
         Creates a TC_Request_On object and publishes on the appropriate topic
         :param controller_id: str
@@ -1059,13 +961,13 @@ class User(TC):
         :param arrival_time: int
         :return: None
         """
-        request = TC_Request_On(self.id, controller_id, phase, arrival_time)
+        request = TC_Request_On(self.id, controller_id, phase)
         topic = TC._tc_topic_format % controller_id
-        msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, arrival_time)
+        msg = "sending reqeust to %s for phase %d" % (controller_id, phase)
         self.output_log(msg)
         self.mqttc.publish(topic, request.encode(), self.qos)
 
-    def send_json_phase_request(self, controller_id:str, phase:int, arrival_time:int=0):
+    def send_json_phase_request(self, controller_id:str, phase:int):
         """
         Creates a TC_Request_On object and publishes on the appropriate topic
         :param controller_id: str
@@ -1073,16 +975,16 @@ class User(TC):
         :param arrival_time: int
         :return: None
         """
-        request = TC_Request_On(self.id, controller_id, phase, arrival_time)
+        request = TC_Request_On(self.id, controller_id, phase)
         topic = TC._tc_topic_format % controller_id
-        msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, arrival_time)
+        msg = "sending reqeust to %s for phase %d" % (controller_id, phase)
         self.output_log(msg)
         payload = StringIO()
         request.json_dump(payload)
         print("json encoding = %s" % payload.getvalue())
         self.mqttc.publish(topic, payload.getvalue(), self.qos)
 
-    def send_phase_release(self, controller_id:str, phase:int, departure_time:int=0):
+    def send_phase_release(self, controller_id:str, phase:int):
         """
         Creates a TC_Reqeust_Off object and publishes on the appropriate topic
         :param controller_id:
@@ -1090,13 +992,13 @@ class User(TC):
         :param departure_time:
         :return: None
         """
-        request = TC_Request_Off(self.id, controller_id, phase, departure_time)
+        request = TC_Request_Off(self.id, controller_id, phase)
         topic = TC._tc_topic_format % controller_id
-        msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, departure_time)
+        msg = "sending reqeust to %s for phase %d" % (controller_id, phase)
         self.output_log(msg)
         self.mqttc.publish(topic, request.encode(), self.qos)
 
-    def send_json_phase_release(self, controller_id:str, phase:int, departure_time:int=0):
+    def send_json_phase_release(self, controller_id:str, phase:int):
         """
         Creates a TC_Reqeust_Off object and publishes on the appropriate topic
         :param controller_id:
@@ -1104,9 +1006,9 @@ class User(TC):
         :param departure_time:
         :return: None
         """
-        request = TC_Request_Off(self.id, controller_id, phase, departure_time)
+        request = TC_Request_Off(self.id, controller_id, phase)
         topic = TC._tc_topic_format % controller_id
-        msg = "sending reqeust to %s for phase %d in %d seconds" % (controller_id, phase, departure_time)
+        msg = "sending reqeust to %s for phase %d"  % (controller_id, phase)
         self.output_log(msg)
         payload = StringIO()
         request.json_dump(payload)

@@ -37,13 +37,13 @@ while True:
             good = False
         if good:
             if op == 'on':
-                myUser.send_json_phase_request(controllerID, phase, arrival)
+                myUser.send_json_phase_request(controllerID, phase)
             elif op == 'off':
-                myUser.send_json_phase_release(controllerID, phase, arrival)
+                myUser.send_json_phase_release(controllerID, phase)
             else:
                 good = False
         if not good:
-            print("USAGE: [on | off] phase seconds")
+            print("USAGE: [on | off] phase")
     except KeyboardInterrupt:
         myUser.stop()
         print()
