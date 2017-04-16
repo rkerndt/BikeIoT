@@ -25,27 +25,19 @@ Install raspberry pi with latest version of raspbian-jessie-lite os.
 
 Connect the pi to a usb keyboard and monitor, boot and login to the pi account (username: pi, password: raspberry)
 
-Launch the raspi-config configuration application:
-  1. scroll to '7 Advanced Options', tab to \<select\> and press enter.
-  2. scroll to 'A4 SSH', tab to \<select\>, press enter and enable remote ssh login
-  3. again scroll to '7 Advanced Options' and select
-  4. scroll to 'A7 I2c', tab to \<selec\>, press enter and enable I2C modules
-  5. tab to \<finish\> and exit.
+With the raspi-config configuration application:
+  1. enable serial console
+  2. enable remote ssh login
 
 Add the following lines to /boot/config.txt. These statements will disable the built-in bluetooth and fix the core frequency. The purpose of this is to allow use of tty0 as the serial console and provide a stable baud rate timing.
 ```
   # Enable serial console
   dtoverlay=pi3-miniuart-bt
   enable_uart=1
-  force_turbo=1
-  init_uart_baud=115200
-  init_uart_clock=3000000
-  gpu_freq=250
-  core_freq=250
 ```
 Check that the file /boot/cmdline.txt contains the following settings:
   ```
-  console=serial0,115200 console=tty1
+  console=serial0,38400 console=tty1
   ```
   
 The TC_server.py code requires I2C enabled. Check that the following is set in /boot/config.txt.
@@ -75,11 +67,14 @@ From the admin's home directory clone the git BikeIoT repository:
   git clone https://git.com/rkerndt/BikeIoT
 ```
 
-Copy tc_service.service and cellular-init.service to /etc/systemd/system.
-Enable both services:
+Copy the following service files to /etc/systemd/system.
+  - tc_service.service
+  - cellular-init.service
+  - serial-getty@.service
+  
+Enable services using the command:
 ```
-  sudo systemctl enable tc_service.service
-  sudo systemctl enable cellular-init.service
+  sudo systemctl enable <name>
 ```
   
 Copy TC_server.py, grovepi.py, and TC.config to /home/pi.
@@ -88,6 +83,7 @@ Customize settings in TC.config for this beacon box.
 
 The tc_service can now be starting by rebooting or in the following order:
 ```
+  sudo systemctl daemon-reload
   sudo systemctl start cellular-init.service
   sudo systemctl start tc_service.service
 ```
