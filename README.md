@@ -37,7 +37,7 @@ Add the following lines to /boot/config.txt. These statements will disable the b
 ```
 Check that the file /boot/cmdline.txt contains the following settings:
   ```
-  console=serial0,115200 console=tty1
+  console=serial0,38400 console=tty1
   ```
   
 The TC_server.py code requires I2C enabled. Check that the following is set in /boot/config.txt.
