@@ -150,15 +150,27 @@ class TC:
     """
 
     @staticmethod
-    def on_will(client, userdata, mqtt_msg):
+    def on_will(client, userdata, msg:mqtt.MQTTMessage):
         """
-        Called when a will topic is received notifying that a peer has died.
+        Called when a will topic is received notifying that a peer has died. Default action is to
+        write human readable form to stdout
         :param client: paho.mqtt.client
         :param userdata: TC Server of Client handling callback
         :param mqtt_msg:
         :return: None
         """
-        pass
+
+        msg = None
+        try:
+            type = TC.get_type(msg.payload)
+            if type == TC.WILL:
+                will_id = TC_Identifier.decode(msg.payload)
+                msg = "[%s: %s] Received will for %s" % (msg.mid, msg.topic, will_id.id)
+        except TC_Exception:
+            pass
+
+        if msg is None:
+            msg = "[%s: %s] Received will payload=<%s>" % (msg.mid, msg.topic, msg.payload)
 
     @staticmethod
     def on_topic(client, userdata, mqtt_msg):
@@ -183,14 +195,9 @@ class TC:
         :param rc: int connection result
         :return: None
         """
-        if userdata.debug_level > 0:
-            msg = TC.CONNACK_LOOKUP[rc]
-            if rc == mqtt.CONNACK_ACCEPTED:
-                userdata.output_log(msg)
-            else:
-                userdata.output_log(msg)
-                userdata.stop()
-
+        rc_string = mqtt.connack_string(rc)
+        msg = "Connection response: %s" % (rc_string)
+        userdata.output_log(msg)
 
     @staticmethod
     def on_disconnect(client, userdata, rc):
@@ -202,12 +209,11 @@ class TC:
         :param rc: int disconnect result
         :return: None
         """
-        if rc != 0:
-            msg = "disconnected from broker: %s" % mqtt.error_string(rc)
-            userdata.output_log(msg)
+        msg = "Disconnected from broker: %s" % mqtt.error_string(rc)
+        userdata.output_log(msg)
 
     @staticmethod
-    def on_message(client, userdata, mqtt_msg):
+    def on_message(client, userdata, msg:mqtt.MQTTMessage):
         """
         Called when a message has been received on a topic that the client subscribes to. This callback will be
         called for every message received. Use message_callback_add() to define multiple callbacks that will be
@@ -218,7 +224,8 @@ class TC:
         :return: None
         """
         if userdata.debug_level > 0:
-            msg = "received message id %d" % (mqtt_msg.mid,)
+            payload_bytes = msg.payload.encode(encoding="utf-8", errors="replace")
+            msg = "[%s: %s] %s" % (msg.mid, msg.topic, payload_bytes)
             userdata.output_log(msg)
 
     @staticmethod
@@ -250,9 +257,9 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
-        if userdata.debug_level > 0:
-            msg = "subscribe granted for message %d with qos %s" % (mqtt_mid, str(granted_qos))
-            userdata.output_log(msg)
+
+        msg = "Subscribe granted on message_id %s with qos %s" % (mqtt_mid, str(granted_qos))
+        userdata.output_log(msg)
 
     @staticmethod
     def on_unsubscribe(client, userdata, mqtt_mid):
@@ -264,7 +271,9 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
-        pass
+        msg = "Unsubscribe acknowledged on message_id %s" % (mqtt_mid,)
+        userdata.output_log(msg)
+
 
     @staticmethod
     def on_log(client, userdata, level, buf):
@@ -276,7 +285,30 @@ class TC:
         :param buf: bytes The actual message
         :return: None
         """
-        pass
+        msg = "[%s] %s" % (level, buf)
+        userdata.output_log(msg)
+
+    @staticmethod
+    def decode_json(mqtt_msg:mqtt.MQTTMessage):
+        """
+        Decodes into a dictionary checks whether "type" key is present and then passes onto appropriate TC request class
+        for validation and decoding.
+
+        :param payload: JSON dictionary encoding
+        :return: TC_type derived class
+        """
+        payload_string = mqtt_msg.payload.decode("utf-8")
+        payload_stream = StringIO(payload_string)
+        payload_dict = json.load(payload_stream)
+        if "type" in payload_dict:
+            type = payload_dict["type"]
+            if type == TC.PHASE_REQUEST_ON or type == TC.PHASE_REQUEST_OFF:
+                request = TC_Request.json_load(payload_dict)
+            else:
+                raise TC_Exception("Unrecognized message type (%d)" % (type,))
+            return request
+
+
 
 class TC_Type:
     """
@@ -867,25 +899,6 @@ class Server (TC):
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
-    @staticmethod
-    def decode_json(mqtt_msg:mqtt.MQTTMessage):
-        """
-        Decodes into a dictionary checks whether "type" key is present and then passes onto appropriate TC request class
-        for validation and decoding.
-
-        :param payload: JSON dictionary encoding
-        :return: TC_type derived class
-        """
-        payload_string = mqtt_msg.payload.decode("utf-8")
-        payload_stream = StringIO(payload_string)
-        payload_dict = json.load(payload_stream)
-        if "type" in payload_dict:
-            type = payload_dict["type"]
-            if type == TC.PHASE_REQUEST_ON or type == TC.PHASE_REQUEST_OFF:
-                request = TC_Request.json_load(payload_dict)
-            else:
-                raise TC_Exception("Unrecognized message type (%d)" % (type,))
-            return request
 
     def signal_handler(self, signum, frame):
         """

@@ -1,0 +1,18 @@
+# Rickie Kerndt <rkerndt@cs.uoregon.edu>
+# systemd service file to start, status and shutdown data logger for Traffic Controller Server
+# This file should be located under directory /etc/systemd/system
+
+[Unit]
+    Description=Traffic Controller Data Logger
+    After=network.target
+
+[Service]
+    Type=idle
+    KillMode=process
+    ExecStart=/usr/bin/python3 /home/pi/Logger.py logger
+    StandardOutput=journal
+    StandardError=journal
+
+[Install]
+    WantedBy=multi-user.target
+
