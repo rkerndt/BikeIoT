@@ -59,7 +59,7 @@ Set up user accounts using passwd and the adduser shell command
   2. Verify that you can log into the admin account, then ...
   3. Disable login for user pi from the admin account:
     ```
-    sudo passwd -i pi
+    sudo passwd -l pi
     ```
   
 From the admin's home directory clone the git BikeIoT repository:
