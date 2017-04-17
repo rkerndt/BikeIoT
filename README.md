@@ -29,7 +29,7 @@ With the raspi-config configuration application:
   1. enable serial console
   2. enable remote ssh login
 
-Add the following lines to /boot/config.txt. These statements will disable the built-in bluetooth and fix the core frequency. The purpose of this is to allow use of tty0 as the serial console and provide a stable baud rate timing.
+Add the following lines to /boot/config.txt. These statements will disable the built-in bluetooth and enable uart for serial console. User Serial0 and Serial1 for all references to the serial devices. These are translated to the appropriate serial device (/dev/ttyAMA0 and /dev/ttyS0). This configuration will set Serial0 = /dev/ttyAMA0 for use as the serial console.
 ```
   # Enable serial console
   dtoverlay=pi3-miniuart-bt
@@ -77,8 +77,11 @@ Enable services using the command:
   sudo systemctl enable <name>
 ```
   
-Copy TC_server.py, grovepi.py, and TC.config to /home/pi.
-
+Copy the following files from the repository to /home/pi.
+  - TC_server.py
+  - grovepi.py
+  - TC.config
+  
 Customize settings in TC.config for this beacon box.
 
 The tc_service can now be starting by rebooting or in the following order:
