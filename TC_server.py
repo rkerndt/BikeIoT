@@ -54,7 +54,7 @@ class TC:
     PHASE_OFF = 0x00
 
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
-    TC_REQUEST_LENGTH = 5
+    TC_REQUEST_LENGTH = 4  # for json encoded objects
 
     # CONNACK codes: returned in rc of on_connect
     CONNACK_LOOKUP = {mqtt.CONNACK_ACCEPTED:'successful connection',
