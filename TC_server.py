@@ -165,12 +165,12 @@ class TC:
             type = TC.get_type(msg.payload)
             if type == TC.WILL:
                 will_id = TC_Identifier.decode(msg.payload)
-                msg = "[%s: %s] Received will for %s" % (msg.mid, msg.topic, will_id.id)
+                msg = "Received will for %s " % (will_id.id,)
         except TC_Exception:
             pass
 
         if msg is None:
-            msg = "[%s: %s] Received will payload=<%s>" % (msg.mid, msg.topic, msg.payload)
+            msg = "Received will payload=<%s>" % (msg.payload)
 
     @staticmethod
     def on_topic(client, userdata, mqtt_msg):
@@ -285,7 +285,7 @@ class TC:
         :param buf: bytes The actual message
         :return: None
         """
-        msg = "[%s] %s" % (level, buf)
+        msg = "Log message: level %d - %s" % (level, buf)
         userdata.output_log(msg)
 
     @staticmethod
@@ -449,7 +449,7 @@ class TC_Request(TC_Identifier):
         :return: TC_Request
         """
         if len(payload) != TC_Request._struct_size:
-            msg = 'improperly formatted TC Request payload'
+            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(payload))
             raise TC_Exception(msg)
 
         type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
@@ -540,7 +540,7 @@ class TC_Request_On(TC_Request):
         :return: TC_Request
         """
         if len(payload) != TC_Request._struct_size:
-            msg = 'improperly formatted TC Request payload'
+            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(payload))
             raise TC_Exception(msg)
 
         type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
@@ -579,7 +579,7 @@ class TC_Request_Off(TC_Request):
         :return: TC_Request
         """
         if len(payload) != TC_Request._struct_size:
-            msg = 'improperly formatted TC Request payload'
+            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(payload))
             raise TC_Exception(msg)
 
         type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
