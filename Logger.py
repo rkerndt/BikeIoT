@@ -131,7 +131,7 @@ class TC_Logger(TC):
             log_msg = "User %s requests phase %d %s for controler %s" % (request.id, request.phase, op, request.controller_id)
             userdata.output_log(log_msg)
         else:
-            log_msg = "Request decode failed for message %s" % (msg.mid,)
+            log_msg = "Request decode failed for message %s <%s>" % (msg.mid, msg.payload)
             userdata.output_log(log_msg)
 
 def main(argv):
