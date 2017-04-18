@@ -32,7 +32,8 @@ class TC_Logger(TC):
         self.mqttc.on_publish = TC.on_publish
         self.mqttc.on_subscribe = TC.on_subscribe
         self.mqttc.on_unsubscribe = TC.on_unsubscribe
-        self.mqttc.on_topic = TC_Logger.on_topic
+        self.mqttc.message_callback_add(self.tc_topic, TC_Logger.on_topic)
+
 
     def run(self):
         """
