@@ -162,10 +162,11 @@ class TC:
 
         msg = None
         try:
-            type = TC.get_type(msg.payload)
-            if type == TC.WILL:
-                will_id = TC_Identifier.decode(msg.payload)
-                msg = "Received will for %s " % (will_id.id,)
+            if msg:
+                type = TC.get_type(msg.payload)
+                if type == TC.WILL:
+                    will_id = TC_Identifier.decode(msg.payload)
+                    msg = "Received will for %s " % (will_id.id,)
         except TC_Exception:
             pass
 
@@ -224,8 +225,7 @@ class TC:
         :return: None
         """
         if userdata.debug_level > 0:
-            payload_bytes = msg.payload.encode(encoding="utf-8", errors="replace")
-            msg = "[%s: %s] %s" % (msg.mid, msg.topic, payload_bytes)
+            msg = "[%s: %s] %s" % (msg.mid, msg.topic, msg.payload)
             userdata.output_log(msg)
 
     @staticmethod
