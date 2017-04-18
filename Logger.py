@@ -19,7 +19,7 @@ class TC_Logger(TC):
         """
         super().__init__()
         self.id = user_id
-        self.tc_topic = TC._topic_base
+        self.tc_topic = TC._topic_base + '#'
         self.mqttc = mqtt.Client(user_id)
         self.mqttc.username_pw_set(user_id, password="BikeIoT")
         self.mqttc.user_data_set(self)
