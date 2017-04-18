@@ -23,16 +23,12 @@ while True:
         good = True
         if len(commands) == 0:
             continue
-        if len(commands) == 3:
-            op, phase, arrival = commands
+        if len(commands) == 2:
+            op, phase = commands
         else:
             good = False
         if good and phase.isdigit():
             phase = int(phase)
-        else:
-            good = False
-        if good and arrival.isdigit():
-            arrival = int(arrival)
         else:
             good = False
         if good:
