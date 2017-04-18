@@ -32,8 +32,6 @@ class TC_Logger(TC):
         self.mqttc.on_publish = TC.on_publish
         self.mqttc.on_subscribe = TC.on_subscribe
         self.mqttc.on_unsubscribe = TC.on_unsubscribe
-        self.mqttc.on_log = TC.on_log
-
 
     def run(self):
         """
@@ -129,6 +127,9 @@ class TC_Logger(TC):
             elif request.type == TC.PHASE_REQUEST_OFF:
                 op = 'off'
             log_msg = "User %s requests phase %d %s for controler %s" % (request.id, request.phase, op, request.controller_id)
+            userdata.output_log(log_msg)
+        else:
+            log_msg = "Request decode failed for message %s" % (msg.mid,)
             userdata.output_log(log_msg)
 
 def main(argv):
