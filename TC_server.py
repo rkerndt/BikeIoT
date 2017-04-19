@@ -56,6 +56,9 @@ class TC:
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
     TC_REQUEST_LENGTH = 4  # for json encoded objects
 
+    # encodings
+    ENCODING_C_STRUC = 0x100
+    ENCODING_JSON   = 0x101
 
     # configuration: TODO: put this stuff into a configuration file
     _qos = 2
@@ -73,6 +76,9 @@ class TC:
     # general payload formats
     _payload_type_format = '!i'
     _payload_type_length = struct.calcsize(_payload_type_format)
+
+    # encodings
+
 
     def __init__(self):
         #self.lock = threading.Lock()
@@ -299,8 +305,9 @@ class TC:
                 request = TC_Request.json_load(payload_dict)
             else:
                 raise TC_Exception("Unrecognized message type (%d)" % (type,))
+            request._encoding = TC.ENCODING_JSON
+            request._mid = mqtt_msg.mid
             return request
-
 
 
 class TC_Type:
@@ -331,17 +338,21 @@ class TC_Type:
         return bytearray(packed)
 
     @classmethod
-    def decode(cls, payload:bytes):
+    def decode(cls, msg:mqtt.MQTTMessage):
         """
         Creates a TC_Type object from bytes object which should have been packed using encode() method
         from TC_Type derived object.
+        :param msg: MQTTMessage
         :return: TC_Type
         """
-        if len(payload) < TC_Type._struct_size:
+        if len(msg.payload) < TC_Type._struct_size:
             msg = 'improperly formatted TC Type (derived) payload'
             raise TC_Exception(msg)
-        (type,) = struct.unpack_from(TC_Type._struct_format, payload, 0)
-        return TC_Type(type)
+        (type,) = struct.unpack_from(TC_Type._struct_format, msg.payload, 0)
+        myType = TC_Type(type)
+        myType._encoding = TC.ENCODING_C_STRUC
+        myType._mid = msg.mid
+        return myType
 
 class TC_Identifier(TC_Type):
     """
@@ -376,19 +387,22 @@ class TC_Identifier(TC_Type):
         return bytearray(packed)
 
     @classmethod
-    def decode(cls, payload:bytes):
+    def decode(cls, msg:mqtt.MQTTMessage):
         """
         Creates a TC_Identifier object from bytes object which should have been packed using TC_Identifier.encode()
         or encoded for a derived class.
+        :param msg: MQTTMessage
         :return: TC_Identifier object
         """
-        if len(payload) < TC_Identifier._struct_size:
+        if len(msg.payload) < TC_Identifier._struct_size:
             msg = 'improperly formatted TC Will payload'
             raise TC_Exception(msg)
-        type, id_bytes = struct.unpack_from(TC_Identifier._struct_format, payload, 0)
+        type, id_bytes = struct.unpack_from(TC_Identifier._struct_format, msg.payload, 0)
         id = id_bytes.decode()
-        return TC_Identifier(type, id)
-
+        myID = TC_Identifier(type, id)
+        myID._encoding = TC.ENCODING_C_STRUC
+        myID._mid = msg.mid
+        return myID
 
 class TC_Request(TC_Identifier):
     """
@@ -435,19 +449,19 @@ class TC_Request(TC_Identifier):
         return bytearray(packed)
 
     @classmethod
-    def decode(cls, payload:bytes):
+    def decode(cls, msg:mqtt.MQTTMessage):
         """
         Creates a TC_Request object from bytes objects which should have been packed using
         TC_Request.encode()
 
-        :param payload: bytes
+        :param msg: MQTTMessage
         :return: TC_Request
         """
-        if len(payload) != TC_Request._struct_size:
-            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(payload))
+        if len(msg.payload) != TC_Request._struct_size:
+            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(msg.payload))
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
+        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
 
         if type != TC.PHASE_REQUEST:
             msg = 'payload claimed to be a phase request but received code (%d)' % type
@@ -455,7 +469,10 @@ class TC_Request(TC_Identifier):
         user_id = user_id_bytes.decode()
         controller_id = controller_id_bytes.decode()
 
-        return TC_Request(user_id, controller_id, phase)
+        myRequest = TC_Request(user_id, controller_id, phase)
+        myRequest._encoding = TC.ENCODING_C_STRUC
+        myRequest._mid = msg.mid
+        return myRequest
 
     def json_dump(self, fs):
         """
@@ -475,8 +492,8 @@ class TC_Request(TC_Identifier):
     @classmethod
     def json_load(cls, json_dict):
         """
-        Creates a TC_Request Object from a JSON string stream
-        :param fs:
+        Creates a TC_Request Object from a JSON derived dictionary object
+        :param json_dict: dict
         :return: TC_Request
         """
 
@@ -526,19 +543,19 @@ class TC_Request_On(TC_Request):
         self.type = TC.PHASE_REQUEST_ON
 
     @classmethod
-    def decode(cls, payload:bytes):
+    def decode(cls, msg:mqtt.MQTTMessage):
         """
         Creates a TC_Request object from bytes objects which should have been packed using
         TC_Request.encode()
 
-        :param payload: bytes
+        :param msg: MQTTMessage
         :return: TC_Request
         """
-        if len(payload) != TC_Request._struct_size:
-            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(payload))
+        if len(msg.payload) != TC_Request._struct_size:
+            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(msg.payload))
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
+        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
 
         if type != TC.PHASE_REQUEST_ON:
             msg = 'payload claimed to be a phase request on but received code (%d)' % type
@@ -546,7 +563,10 @@ class TC_Request_On(TC_Request):
         user_id = user_id_bytes.decode()
         controller_id = controller_id_bytes.decode()
 
-        return TC_Request_On(user_id, controller_id, phase)
+        myRequestOn = TC_Request_On(user_id, controller_id, phase)
+        myRequestOn._encoding = TC.ENCODING_C_STRUC
+        myRequestOn._mid = msg.mid
+        return myRequestOn
 
 
 class TC_Request_Off(TC_Request):
@@ -565,19 +585,19 @@ class TC_Request_Off(TC_Request):
         self.type = TC.PHASE_REQUEST_OFF
 
     @classmethod
-    def decode(cls, payload:bytes):
+    def decode(cls, msg:mqtt.MQTTMessage):
         """
         Creates a TC_Request object from bytes objects which should have been packed using
         TC_Request.encode()
 
-        :param payload: bytes
+        :param msg: MQTTMessage
         :return: TC_Request
         """
-        if len(payload) != TC_Request._struct_size:
-            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(payload))
+        if len(msg.payload) != TC_Request._struct_size:
+            msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(msg.payload))
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, payload)
+        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
 
         if type != TC.PHASE_REQUEST_OFF:
             msg = 'payload claimed to be a phase request off but received code (%d)' % type
@@ -585,7 +605,10 @@ class TC_Request_Off(TC_Request):
         user_id = user_id_bytes.decode()
         controller_id = controller_id_bytes.decode()
 
-        return TC_Request_Off(user_id, controller_id, phase)
+        myRequestOff = TC_Request_Off(user_id, controller_id, phase)
+        myRequestOff._encoding = TC.ENCODING_C_STRUC
+        myRequestOff._mid = msg.mid
+        return myRequestOff
 
 class TC_phase_request:
     """
@@ -880,12 +903,12 @@ class Server (TC):
 
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
-            request_type = Server.get_type(mqtt_msg.payload)
+            request_type = Server.get_type(mqtt_msg)
             if request_type == TC.PHASE_REQUEST_ON:
-                request = TC_Request_On.decode(mqtt_msg.payload)
+                request = TC_Request_On.decode(mqtt_msg)
                 userdata.request_phase(request)
             elif request_type == TC.PHASE_REQUEST_OFF:
-                request = TC_Request_Off.decode(mqtt_msg.payload)
+                request = TC_Request_Off.decode(mqtt_msg)
                 userdata.request_phase(request)
             else:
                 # try decoding as a json encoded string
