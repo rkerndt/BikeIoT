@@ -56,13 +56,6 @@ class TC:
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
     TC_REQUEST_LENGTH = 4  # for json encoded objects
 
-    # CONNACK codes: returned in rc of on_connect
-    CONNACK_LOOKUP = {mqtt.CONNACK_ACCEPTED:'successful connection',
-                      mqtt.CONNACK_REFUSED_PROTOCOL_VERSION:'failed due to incorrect protocol version',
-                      mqtt.CONNACK_REFUSED_IDENTIFIER_REJECTED:'failed due to rejected identifier',
-                      mqtt.CONNACK_REFUSED_SERVER_UNAVAILABLE:'failed due to unavailable server',
-                      mqtt.CONNACK_REFUSED_BAD_USERNAME_PASSWORD:'failed due to bad username or password',
-                      mqtt.CONNACK_REFUSED_NOT_AUTHORIZED:'failed due to not authorized'}
 
     # configuration: TODO: put this stuff into a configuration file
     _qos = 2
@@ -323,6 +316,8 @@ class TC_Type:
         would be better done using get_type() method in class TC.
         """
         self.type = type
+        self._encoding = None
+        self._mid = None
 
     def encode(self):
         """
