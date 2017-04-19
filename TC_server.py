@@ -159,18 +159,18 @@ class TC:
         :return: None
         """
 
-        msg = None
+        log_msg = None
         try:
             if msg:
                 type = TC.get_type(msg.payload)
                 if type == TC.WILL:
                     will_id = TC_Identifier.decode(msg.payload)
-                    msg = "Received will for %s " % (will_id.id,)
+                    log_msg = "Received will for %s " % (will_id.id,)
+                    userdata.output_log(log_msg)
         except TC_Exception:
-            pass
+            log_msg = "Received will of unknown format %s" % (msg.payload,)
+            userdata.output_log(log_msg)
 
-        if msg is None:
-            msg = "Received will payload=<%s>" % (msg.payload)
 
     @staticmethod
     def on_topic(client, userdata, mqtt_msg):
@@ -903,7 +903,7 @@ class Server (TC):
 
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
-            request_type = Server.get_type(mqtt_msg)
+            request_type = Server.get_type(mqtt_msg.payload)
             if request_type == TC.PHASE_REQUEST_ON:
                 request = TC_Request_On.decode(mqtt_msg)
                 userdata.request_phase(request)
