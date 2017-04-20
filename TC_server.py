@@ -19,6 +19,7 @@ import signal
 import socket
 from io import StringIO
 import json
+from ctypes import *
 
 class TC_Exception (Exception):
     """
@@ -56,7 +57,8 @@ class TC:
     CHECK_PHASE_TIMEOUT_INTERVAL = 4
     PHASE_ON =  0x01
     PHASE_OFF = 0x00
-
+    WATCHDOG_SEC = 3
+    WATCHDOG_INTERVAL = 1
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
     TC_REQUEST_LENGTH = 4  # for json encoded objects
     TC_ACK_LENGTH = 4
@@ -952,12 +954,17 @@ class Server (TC):
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
         self.mqttc.message_callback_add(self.tc_topic, Server.on_topic)
 
+        # watchdog timer
+        self._watchdog_timer = threading.Timer(TC.WATCHDOG_SEC, self.watchdog)
+
     def run(self):
         """
         Connects to broker and begins loop.
         TODO: Needs some error handling, response to connect and subscribe. What happens if client disconnects?
         :return: None
         """
+
+        self._watchdog_timer.start()
 
         connected = False
         connection_retry_delay = TC.INITIAL_CONNECTION_RETRY_DELAY
@@ -993,6 +1000,8 @@ class Server (TC):
         # enter network loop forever, relying on interrupt handler to stop things
         self._relays.start()
         self.mqttc.loop_forever()
+
+        # load libsystemd and initialize a timer to call watchdog
 
     def stop(self):
         """
@@ -1092,6 +1101,28 @@ class Server (TC):
             userdata.output_error(err.msg)
 
 
+    def watchdog(self):
+        """
+        Method sends 'heartbeat' to sd_notfiy(3). When run from systemd will cause system to restart the service.
+        This should be called with a period <= WatchdogSec/3. (see systemd.serive(8))
+
+        Add features to the method to check on status and take corrective actions as needed.
+        :return: None
+        """
+
+        healthy = True
+
+        # check if children are still alive
+        if not self._relays.is_alive():
+            healthy = False
+
+        # load the library at run time using cdll
+        if healthy:
+            cdll.libsystemd.sd_notify("WATCHDOG=1\n")
+
+        self._watchdog_timer = threading.Timer(TC.WATCHDOG_INTERVAL, self.watchdog())
+        self._watchdog_timer.start()
+
     def signal_handler(self, signum, frame):
         """
         Shuts down server on SIGINT and SIGTERM
@@ -1133,7 +1164,10 @@ class User(TC):
         self.mqttc.on_message = TC.on_message
         self.mqttc.on_publish = TC.on_publish
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
-        #self.mqttc.message_callback_add(self.my_topic, self.on_topic)
+        self.mqttc.message_callback_add(self.my_topic, self.on_topic)
+
+        # event set when ACK received
+        self._ack_event = threading.Event()
 
     def start(self):
         """
@@ -1221,6 +1255,32 @@ class User(TC):
         payload = StringIO()
         request.json_dump(payload)
         self.mqttc.publish(topic, payload.getvalue(), self.qos)
+
+    @staticmethod
+    def on_topic(client:mqtt.Client, userdata, mqtt_msg:mqtt.MQTTMessage):
+        """
+        Listens for ACK and sets _ack_event
+        :param client:
+        :param userdata:
+        :param mqtt_msg:
+        :return: None
+        """
+
+        type = TC.get_type(mqtt_msg.payload)
+        if type == TC.ACK:
+            userdata._ack_event.set()
+        else:
+            msg = "Received type %d on %s" % (type, mqtt_msg.topic)
+            userdata.output_log(msg)
+
+    def ping(self, controller_id):
+        """
+        Sends a TC_Identifier to controller
+        :return: None
+        """
+        myID = TC_Identifier(TC.ID, self.id)
+        topic = TC._tc_topic_format % (controller_id,)
+        self.mqttc.publish(topic, myID.encode(), TC.DEFAULT_QOS)
 
 def main(argv):
     """
