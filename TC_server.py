@@ -38,11 +38,15 @@ class TC:
     Base class to hold some common attributes and methods between Server and User derived classes
     """
 
-    # Constants
+    # Message Types
     WILL = 0x00
     PHASE_REQUEST =     0x01
     PHASE_REQUEST_ON =  0x02
     PHASE_REQUEST_OFF = 0x03
+    ACK = 0x04
+    ID = 0x05
+
+    # Constants
     MAX_PHASE_ON_SECS = 0x30
     CONNECTION_RETRY_FACTOR = 2
     INITIAL_CONNECTION_RETRY_DELAY = 0.1
@@ -55,6 +59,7 @@ class TC:
 
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
     TC_REQUEST_LENGTH = 4  # for json encoded objects
+    TC_ACK_LENGTH = 4
 
     # encodings
     ENCODING_C_STRUC = 0x100
@@ -303,10 +308,12 @@ class TC:
             type = payload_dict["type"]
             if type == TC.PHASE_REQUEST_ON or type == TC.PHASE_REQUEST_OFF:
                 request = TC_Request.json_load(payload_dict)
+            elif type == TC.ACK:
+                request = TC_ACK.json_load(payload_dict)
             else:
                 raise TC_Exception("Unrecognized message type (%d)" % (type,))
             request._encoding = TC.ENCODING_JSON
-            request._mid = mqtt_msg.mid
+            request._src_mid = mqtt_msg.mid
             return request
 
 
@@ -324,7 +331,7 @@ class TC_Type:
         """
         self.type = type
         self._encoding = None
-        self._mid = None
+        self._src_mid = None
 
     def encode(self):
         """
@@ -351,7 +358,7 @@ class TC_Type:
         (type,) = struct.unpack_from(TC_Type._struct_format, msg.payload, 0)
         myType = TC_Type(type)
         myType._encoding = TC.ENCODING_C_STRUC
-        myType._mid = msg.mid
+        myType._src_mid = msg.mid
         return myType
 
 class TC_Identifier(TC_Type):
@@ -401,7 +408,7 @@ class TC_Identifier(TC_Type):
         id = id_bytes.decode()
         myID = TC_Identifier(type, id)
         myID._encoding = TC.ENCODING_C_STRUC
-        myID._mid = msg.mid
+        myID._src_mid = msg.mid
         return myID
 
 class TC_Request(TC_Identifier):
@@ -471,7 +478,7 @@ class TC_Request(TC_Identifier):
 
         myRequest = TC_Request(user_id, controller_id, phase)
         myRequest._encoding = TC.ENCODING_C_STRUC
-        myRequest._mid = msg.mid
+        myRequest._src_mid = msg.mid
         return myRequest
 
     def json_dump(self, fs):
@@ -492,14 +499,14 @@ class TC_Request(TC_Identifier):
     @classmethod
     def json_load(cls, json_dict):
         """
-        Creates a TC_Request Object from a JSON derived dictionary object
+        Creates a TC_ACK Object from a JSON derived dictionary object
         :param json_dict: dict
-        :return: TC_Request
+        :return: TC_ACK
         """
 
         # validate dictionary and then create TC_Request Object
-        if len(json_dict) != TC.TC_REQUEST_LENGTH:
-            msg = "JSON encoding contains %d elements when expecting %d" % (len(json_dict), TC.TC_REQUEST_LENGTH)
+        if len(json_dict) != TC.TC_ACK_LENGTH:
+            msg = "JSON encoding contains %d elements when expecting %d" % (len(json_dict), TC.TC_ACK_LENGTH)
             raise TC_Exception(msg)
         try:
             type = int(json_dict['type'])
@@ -565,7 +572,7 @@ class TC_Request_On(TC_Request):
 
         myRequestOn = TC_Request_On(user_id, controller_id, phase)
         myRequestOn._encoding = TC.ENCODING_C_STRUC
-        myRequestOn._mid = msg.mid
+        myRequestOn._src_mid = msg.mid
         return myRequestOn
 
 
@@ -607,8 +614,128 @@ class TC_Request_Off(TC_Request):
 
         myRequestOff = TC_Request_Off(user_id, controller_id, phase)
         myRequestOff._encoding = TC.ENCODING_C_STRUC
-        myRequestOff._mid = msg.mid
+        myRequestOff._src_mid = msg.mid
         return myRequestOff
+
+
+class TC_ACK(TC_Identifier):
+    """
+    TC_ACK provides acknowledgement that referenced command suceeded
+    """
+
+    # acknowledgement result codes
+    OK = 0x00
+    INVALID_PHASE = 0x01
+    RESULT_CODES = { OK: 'OK',
+                     INVALID_PHASE: 'Invalid Phase Number'}
+
+    _struct_format = '!i%dsii' % (TC.MAX_ID_BYTES,)
+    _struct_size = struct.calcsize(_struct_format)
+
+
+    def __init__(self, user_id, mid, result_code):
+        """
+
+        :param user_id:
+        :param mid:
+        :param result_code:
+        """
+        super().__init__(TC.ACK, user_id)
+        self.mid = mid
+        self.rc = None
+        if result_code in TC_ACK.RESULT_CODES:
+            self.rc = result_code
+        else:
+            raise TC_Exception("Result code %d out of range" % (result_code,))
+
+    def encode(self):
+        """
+        Converts python values into a bytes object representing a c structure for use in mqtt payload. Strings
+        are encoded as a utf-8 bytes object and packed as a char[].
+
+        struct TC_ACK {
+            int type;
+            char user_id[TC.MAX_ID_BYTES];
+            int mid;
+            int rc;
+            } __attribute__((PACKED));
+
+        :return: bytearray
+        """
+        user_id_bytes = self.id.encode('utf-8')
+        if len(user_id_bytes) > TC.MAX_ID_BYTES:
+            msg = "user id <%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
+            raise TC_Exception(msg)
+        packed = struct.pack(TC_Request._struct_format, self.type, user_id_bytes, self.mid, self.rc)
+        return bytearray(packed)
+
+
+    @classmethod
+    def decode(cls, msg:mqtt.MQTTMessage):
+        """
+        Creates a TC_ACK obj from payload that was encoded using TC_ACK.encode
+        :param msg: MQTTMessage
+        :return:
+        """
+        if len(msg.payload) != TC_ACK._struct_size:
+            msg = 'improperly formatted TC ACK payload: expected %d bytes got %d' % (TC_ACK._struct_size, len(msg.payload))
+            raise TC_Exception(msg)
+
+        type, user_id_bytes, mid, rc = struct.unpack(TC_Request._struct_format, msg.payload)
+
+        if type != TC.ACK:
+            msg = 'payload claimed to be an ACK but received code (%d)' % type
+            raise TC_Exception(msg)
+        user_id = user_id_bytes.decode()
+
+        myACK = TC_ACK(user_id, mid, rc)
+        myACK._encoding = TC.ENCODING_C_STRUC
+        myACK._src_mid = msg.mid
+
+        return myACK
+
+
+    def json_dump(self, fs):
+        """
+        Encodes TC_ACK object into a JSON string and writes to fs (stream object)
+        :param fs:
+        :return: None
+        """
+        json_dict = {}
+        json_dict['type'] = self.type
+        json_dict['id'] = self.id
+        json_dict['mid'] = self.mid
+        json_dict['rc'] =self.rc
+        json.dump(json_dict, fs)
+
+    @classmethod
+    def json_load(cls, json_dict):
+        """
+        Creates a TC_ACK Object from a JSON derived dictionary object
+        :param json_dict: dict
+        :return: TC_ACK
+        """
+        # validate dictionary and then create TC_Request Object
+        if len(json_dict) != TC.TC_ACK_LENGTH:
+            msg = "JSON encoding contains %d elements when expecting %d" % (len(json_dict), TC.TC_ACK_LENGTH)
+            raise TC_Exception(msg)
+        try:
+            id = json_dict['id']
+            mid = int(json_dict['mid'])
+            rc = int(json_dict['rc'])
+            return TC_ACK(id, mid, rc)
+        except:
+            msg = "Malformed TC_Request Encoding: %s" % (str(json_dict),)
+            raise TC_Exception(msg)
+
+    def __str__(self):
+        """
+        Human readable string
+        :return: string
+        """
+        msg = "Acknowledgement of message id %d with result %s" % (self.mid, TC_ACK.RESULT_CODES[self.rc])
+        return msg
+
 
 class TC_phase_request:
     """
@@ -872,6 +999,8 @@ class Server (TC):
         :return: None
         """
 
+        rc = TC_ACK.OK
+
         if request.phase in self.phases:
             if request.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
                 msg = "processing request type %d for phase %d from %s" % (request.type, request.phase, request.id)
@@ -887,6 +1016,26 @@ class Server (TC):
         else:
             msg = "received an invalid phase number %d" % (request.phase,)
             self.output_error(msg)
+            rc = TC_ACK.INVALID_PHASE
+
+        # send ack
+        self.send_ack(request, rc)
+
+    def send_ack(self, tc_cmd:TC_Identifier, rc:int):
+        """
+
+        :param tc_cmd: TC_Identifier
+        :param rc:
+        :return: None
+        """
+        ack = TC_ACK(tc_cmd.id, tc_cmd._src_mid, rc)
+        topic = "%s%s/" % (TC._topic_base, tc_cmd.id)
+        if tc_cmd._encoding == TC.ENCODING_JSON:
+            payload = StringIO()
+            ack.json_dump(payload)
+            self.mqttc.publish(topic, payload.getvalue(), TC.DEFAULT_QOS)
+        else:
+            self.mqttc.publish(topic, ack.encode(), TC.DEFAULT_QOS)
 
     @staticmethod
     def on_topic(client:mqtt.Client, userdata, mqtt_msg:mqtt.MQTTMessage):
@@ -910,10 +1059,16 @@ class Server (TC):
             elif request_type == TC.PHASE_REQUEST_OFF:
                 request = TC_Request_Off.decode(mqtt_msg)
                 userdata.request_phase(request)
+            elif request_type == TC.ID:
+                tc_cmd = TC_Identifier.decode(mqtt_msg)
+                userdata.send_ack(tc_cmd, TC_ACK.OK)
             else:
                 # try decoding as a json encoded string
-                request = Server.decode_json(mqtt_msg)
-                userdata.request_phase(request)
+                tc_cmd = Server.decode_json(mqtt_msg)
+                if tc_cmd.type == TC.ACK:
+                    userdata.send_ack(tc_cmd, TC_ACK.OK)
+                else:
+                    userdata.request_phase(tc_cmd)
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
