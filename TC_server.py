@@ -169,7 +169,7 @@ class TC:
             if msg:
                 type = TC.get_type(msg.payload)
                 if type == TC.WILL:
-                    will_id = TC_Identifier.decode(msg.payload)
+                    will_id = TC_Identifier.decode(msg)
                     log_msg = "Received will for %s " % (will_id.id,)
                     userdata.output_log(log_msg)
         except TC_Exception:
@@ -666,7 +666,7 @@ class TC_ACK(TC_Identifier):
         if len(user_id_bytes) > TC.MAX_ID_BYTES:
             msg = "user id <%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        packed = struct.pack(TC_Request._struct_format, self.type, user_id_bytes, self.mid, self.rc)
+        packed = struct.pack(TC_ACK._struct_format, self.type, user_id_bytes, self.mid, self.rc)
         return bytearray(packed)
 
 
