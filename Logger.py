@@ -106,12 +106,7 @@ class TC_Logger(TC):
         :return: None
         """
 
-
-        # only handling PHASE_REQUEST for now, if no match then ignore
-
-        log_msg = None
         request = None
-        op = '<unknown>'
 
         try:
             request_type = TC.get_type(msg.payload)
@@ -129,7 +124,8 @@ class TC_Logger(TC):
         except JSONDecodeError as err:
             userdata.output_error(err.msg)
         if request:
-            userdata.output_log(request)
+            log_msg = "[%s] %s" % (msg.topic, request.__str__())
+            userdata.output_log(log_msg)
         else:
             log_msg = "Request decode failed for message %s <%s>" % (msg.mid, msg.payload)
             userdata.output_log(log_msg)
