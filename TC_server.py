@@ -76,7 +76,7 @@ class TC:
     _bind_address = "100.81.111.18"
     _default_phase_map = { 1:2, 2:3, 3:4, 4:5 } # phase:pin
     _phase_dwell = 0.1
-    _debug_level = 2
+    _debug_level = 3
 
     # general payload formats
     _payload_type_format = '!i'
@@ -1100,6 +1100,7 @@ class User(TC):
         """
         super().__init__()
         self.id = user_id
+        self.my_topic = "%s%s/" % (TC._topic_base, self.id)
         self.mqttc = mqtt.Client(user_id)
         self.qos = TC.DEFAULT_QOS
 
@@ -1117,6 +1118,7 @@ class User(TC):
         self.mqttc.on_message = TC.on_message
         self.mqttc.on_publish = TC.on_publish
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
+        #self.mqttc.message_callback_add(self.my_topic, self.on_topic)
 
     def start(self):
         """
@@ -1128,6 +1130,7 @@ class User(TC):
 
         # subscribe to will topic to get messages intended for me
         self.mqttc.subscribe(self._will_topic, self._qos)
+        self.mqttc.subscribe(self.my_topic, self._qos)
 
 
         # start network loop
