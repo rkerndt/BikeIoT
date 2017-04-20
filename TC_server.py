@@ -748,7 +748,7 @@ class TC_ACK(TC_Identifier):
         Human readable string
         :return: string
         """
-        msg = "Acknowledgement of message id %d with result %s" % (self.mid, TC_ACK.RESULT_CODES[self.rc])
+        msg = "Acknowledgement to %s for message id %d with result %s" % (self.id, self.mid, TC_ACK.RESULT_CODES[self.rc])
         return msg
 
 
