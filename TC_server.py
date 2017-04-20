@@ -1053,7 +1053,7 @@ class Server (TC):
             self.mqttc.publish(topic, ack.encode(), TC.DEFAULT_QOS)
 
         if self._debug_level > 2:
-            msg = "Sent ACK to %s for message id %d with result %d" % (ack.id, ack.mid, ack.rc)
+            msg = "Sent ACK to %s for message id %d with result %d" % (topic, ack.mid, ack.rc)
             self.output_log(msg)
 
     @staticmethod
