@@ -1002,6 +1002,7 @@ class Server (TC):
         self.mqttc.loop_forever()
 
         # load libsystemd and initialize a timer to call watchdog
+        cdll.LoadLibrary("libsystemd.so")
 
     def stop(self):
         """
