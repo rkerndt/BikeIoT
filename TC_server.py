@@ -68,8 +68,8 @@ class TC:
     # configuration: TODO: put this stuff into a configuration file
     _qos = 2
     _topic_base = 'tc/'
-    _will_topic =  _topic_base + 'will/'
-    _tc_topic_format = _topic_base + '%s/'
+    _will_topic =  _topic_base + 'will'
+    _tc_topic_format = _topic_base + '%s'
     _broker_url = 'mqtt.eug.kerndt.com'  #iot.eclipse.org or test.mosquitto.org
     _broker_port = 1883
     _broker_keepalive = 60
@@ -1044,7 +1044,7 @@ class Server (TC):
         :return: None
         """
         ack = TC_ACK(tc_cmd.id, tc_cmd._src_mid, rc)
-        topic = "%s%s/" % (TC._topic_base, tc_cmd.id)
+        topic = TC._tc_topic_format % (tc_cmd.id,)
         if tc_cmd._encoding == TC.ENCODING_JSON:
             payload = StringIO()
             ack.json_dump(payload)
@@ -1115,7 +1115,7 @@ class User(TC):
         """
         super().__init__()
         self.id = user_id
-        self.my_topic = "%s%s/" % (TC._topic_base, self.id)
+        self.my_topic = TC._tc_topic_format % (self.id,)
         self.mqttc = mqtt.Client(user_id)
         self.qos = TC.DEFAULT_QOS
 
