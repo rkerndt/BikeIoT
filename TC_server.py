@@ -361,6 +361,13 @@ class TC_Type:
         myType._src_mid = msg.mid
         return myType
 
+    def __str__(self):
+        """
+        My human readable form
+        :return: string
+        """
+        return "tc command type %d" % (self.type,)
+
 class TC_Identifier(TC_Type):
     """
     Structure for TC identifier payload. Includes just the type and sender fields. This class is used for the
@@ -410,6 +417,14 @@ class TC_Identifier(TC_Type):
         myID._encoding = TC.ENCODING_C_STRUC
         myID._src_mid = msg.mid
         return myID
+
+    def __str__(self):
+        """
+        My human readable form
+        :return: string
+        """
+        return "tc command type %d with ID %s" % (self.type, self.id)
+
 
 class TC_Request(TC_Identifier):
     """

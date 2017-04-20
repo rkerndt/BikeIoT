@@ -3,12 +3,13 @@ Rickie Kerndt <rkerndt@cs.uoregon.edu>
 Subscribes to all tc\ messages and output message payload to file.
 """
 
-from TC_server import TC, TC_Exception, TC_Identifier, TC_Request_Off, TC_Request_On
+from TC_server import TC, TC_Exception, TC_Identifier, TC_Request_Off, TC_Request_On, TC_ACK
 import paho.mqtt.client as mqtt
 import socket
 from time import sleep
 import signal
 import sys
+from json import JSONDecodeError
 
 class TC_Logger(TC):
 
@@ -115,21 +116,20 @@ class TC_Logger(TC):
         try:
             request_type = TC.get_type(msg.payload)
             if request_type == TC.PHASE_REQUEST_ON:
-                request = TC_Request_On.decode(msg.payload)
+                request = TC_Request_On.decode(msg)
             elif request_type == TC.PHASE_REQUEST_OFF:
-                request = TC_Request_Off.decode(msg.payload)
+                request = TC_Request_Off.decode(msg)
+            elif request_type == TC.ACK:
+                request = TC_ACK(msg)
             else:
                 # try decoding as a json encoded string
                 request = TC.decode_json(msg)
         except TC_Exception as err:
             userdata.output_error(err.msg)
+        except JSONDecodeError as err:
+            userdata.output_error(err.msg)
         if request:
-            if request.type == TC.PHASE_REQUEST_ON:
-                op = 'on'
-            elif request.type == TC.PHASE_REQUEST_OFF:
-                op = 'off'
-            log_msg = "User %s requests phase %d %s for controler %s" % (request.id, request.phase, op, request.controller_id)
-            userdata.output_log(log_msg)
+            userdata.output_log(request)
         else:
             log_msg = "Request decode failed for message %s <%s>" % (msg.mid, msg.payload)
             userdata.output_log(log_msg)
