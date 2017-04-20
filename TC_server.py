@@ -1037,6 +1037,10 @@ class Server (TC):
         else:
             self.mqttc.publish(topic, ack.encode(), TC.DEFAULT_QOS)
 
+        if self._debug_level > 2:
+            msg = "Sent ACK to %s for message id %d with result %d" % (ack.id, ack.mid, ack.rc)
+            self.output_log(msg)
+
     @staticmethod
     def on_topic(client:mqtt.Client, userdata, mqtt_msg:mqtt.MQTTMessage):
         """
