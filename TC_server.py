@@ -696,7 +696,7 @@ class TC_ACK(TC_Identifier):
             msg = 'improperly formatted TC ACK payload: expected %d bytes got %d' % (TC_ACK._struct_size, len(msg.payload))
             raise TC_Exception(msg)
 
-        type, user_id_bytes, mid, rc = struct.unpack(TC_Request._struct_format, msg.payload)
+        type, user_id_bytes, mid, rc = struct.unpack(TC_ACK._struct_format, msg.payload)
 
         if type != TC.ACK:
             msg = 'payload claimed to be an ACK but received code (%d)' % type
