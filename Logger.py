@@ -120,7 +120,7 @@ class TC_Logger(TC):
             elif request_type == TC.PHASE_REQUEST_OFF:
                 request = TC_Request_Off.decode(msg)
             elif request_type == TC.ACK:
-                request = TC_ACK(msg)
+                request = TC_ACK.decode(msg)
             else:
                 # try decoding as a json encoded string
                 request = TC.decode_json(msg)
