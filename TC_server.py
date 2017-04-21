@@ -957,6 +957,9 @@ class Server (TC):
         # watchdog timer
         self._watchdog_timer = threading.Timer(TC.WATCHDOG_SEC, self.watchdog)
 
+        # ctypes
+        self._libsystemd = None
+
     def run(self):
         """
         Connects to broker and begins loop.
@@ -1002,7 +1005,7 @@ class Server (TC):
         self.mqttc.loop_forever()
 
         # load libsystemd and initialize a timer to call watchdog
-        cdll.LoadLibrary("libsystemd.so")
+        self._libsystemd = CDLL("libsystemd.so")
 
     def stop(self):
         """
@@ -1119,7 +1122,7 @@ class Server (TC):
 
         # load the library at run time using cdll
         if healthy:
-            cdll.libsystemd.sd_notify("WATCHDOG=1\n")
+            self._libsystemd.sd_notify("WATCHDOG=1\n")
 
         self._watchdog_timer = threading.Timer(TC.WATCHDOG_INTERVAL, self.watchdog())
         self._watchdog_timer.start()
