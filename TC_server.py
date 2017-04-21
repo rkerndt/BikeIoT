@@ -967,7 +967,9 @@ class Server (TC):
         :return: None
         """
 
+        # initialize watchdog
         self._watchdog_timer.start()
+        self._libsystemd = CDLL("libsystemd.so")
 
         connected = False
         connection_retry_delay = TC.INITIAL_CONNECTION_RETRY_DELAY
@@ -1004,8 +1006,6 @@ class Server (TC):
         self._relays.start()
         self.mqttc.loop_forever()
 
-        # load libsystemd and initialize a timer to call watchdog
-        self._libsystemd = CDLL("libsystemd.so")
 
     def stop(self):
         """
