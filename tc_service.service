@@ -9,6 +9,8 @@
 [Service]
     Type=idle
     KillMode=process
+    WatchdogSec=3
+    Restart=on_watchdog
     ExecStart=/usr/bin/python3 /home/pi/TC_server.py beacon_1.cs.uoregon.edu
 
 [Install]
