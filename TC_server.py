@@ -20,6 +20,7 @@ import socket
 from io import StringIO
 import json
 from ctypes import *
+import os
 
 class TC_Exception (Exception):
     """
@@ -1115,6 +1116,10 @@ class Server (TC):
         :return: None
         """
 
+        if TC._debug_level > 2:
+            msg = "Running watchdog"
+            self.output_log(msg)
+
         healthy = True
 
         # check if children are still alive
@@ -1122,8 +1127,8 @@ class Server (TC):
             healthy = False
 
         # load the library at run time using cdll
-        if healthy:
-            self._libsystemd.sd_notify("WATCHDOG=1\n")
+        #if healthy:
+        self._libsystemd.sd_notify("WATCHDOG=1\n")
 
         self._watchdog_timer = threading.Timer(TC.WATCHDOG_INTERVAL, self.watchdog)
         self._watchdog_timer.start()
@@ -1295,6 +1300,16 @@ def main(argv):
     """
 
     USAGE = "TC_server controller_id"
+    watchdog_pid = None
+    watchdog_usec = None
+
+    # get watchdog settings for this process
+    if "WATCHDOG_PID" in os.environ:
+        watchdog_pid = os.environ["WATCHDOG_PID"]
+        print("watchdog pid = %s" % (watchdog_pid,))
+    if "WATCHDOG_USEC" in os.environ:
+        watchdog_usec = os.environ["WATCHDOG_USEC"]
+        print("watchdog usec = %s" % (watchdog_usec,))
 
     if len(argv) != 2:
         print(USAGE, file=sys.stdout)
