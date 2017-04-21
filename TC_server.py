@@ -1016,6 +1016,7 @@ class Server (TC):
         msg = "stopping TC Server for controller %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.disconnect()
+        self._watchdog_timer.cancel()
         if self._relays.isAlive():
             self._relays.stop()
             self._relays.join()
