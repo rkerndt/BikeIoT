@@ -1124,7 +1124,7 @@ class Server (TC):
         if healthy:
             self._libsystemd.sd_notify("WATCHDOG=1\n")
 
-        self._watchdog_timer = threading.Timer(TC.WATCHDOG_INTERVAL, self.watchdog())
+        self._watchdog_timer = threading.Timer(TC.WATCHDOG_INTERVAL, self.watchdog)
         self._watchdog_timer.start()
 
     def signal_handler(self, signum, frame):
