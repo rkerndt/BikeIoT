@@ -50,6 +50,7 @@ Additional packages required by TC_server.py
   - libi2c-dev
   - python-smbus
   - paho-mqtt
+  - libsystemd-dev
   
 Set up user accounts using passwd and the adduser shell command
   1. First create an admin account:
