@@ -956,7 +956,9 @@ class Server (TC):
         self.mqttc.message_callback_add(self.tc_topic, Server.on_topic)
 
         # watchdog timer
-        self._watchdog_timer = threading.Timer(TC.WATCHDOG_SEC, self.watchdog)
+        self._watchdog_timer = None
+        self.watchdog_pid = None
+        self.watchdog_sec = TC.WATCHDOG_SEC
 
         # ctypes
         self._libsystemd = None
@@ -969,8 +971,10 @@ class Server (TC):
         """
 
         # initialize watchdog
-        self._watchdog_timer.start()
-        self._libsystemd = CDLL("libsystemd.so")
+        if self.watchdog_pid:
+            self._libsystemd = CDLL("libsystemd.so")
+            self._watchdog_timer = threading.Timer(self.watchdog_sec/TC.WATCHDOG_INTERVAL, self.watchdog)
+            self._watchdog_timer.start()
 
         connected = False
         connection_retry_delay = TC.INITIAL_CONNECTION_RETRY_DELAY
@@ -1128,9 +1132,9 @@ class Server (TC):
 
         # load the library at run time using cdll
         #if healthy:
-        self._libsystemd.sd_notify("WATCHDOG=1\n")
+        self._libsystemd.sd_notify(self.watchdog_pid,0,"WATCHDOG=1\n")
 
-        self._watchdog_timer = threading.Timer(TC.WATCHDOG_INTERVAL, self.watchdog)
+        self._watchdog_timer = threading.Timer(self.watchdog_sec/TC.WATCHDOG_INTERVAL, self.watchdog)
         self._watchdog_timer.start()
 
     def signal_handler(self, signum, frame):
@@ -1316,6 +1320,10 @@ def main(argv):
         sys.exit(0)
 
     myTC = Server(argv[1])
+    if watchdog_pid and watchdog_pid.isdigit():
+        myTC.watchdog_pid = int(watchdog_pid)
+    if watchdog_usec and watchdog_usec.isdigit():
+        myTC.watchdog_sec = watchdog_usec // 1000
 
     signal.signal(signal.SIGTERM, myTC.signal_handler)
     signal.signal(signal.SIGINT, myTC.signal_handler)
