@@ -58,8 +58,8 @@ class TC:
     CHECK_PHASE_TIMEOUT_INTERVAL = 4
     PHASE_ON =  0x01
     PHASE_OFF = 0x00
-    WATCHDOG_SEC = 3
-    WATCHDOG_INTERVAL = 1
+    WATCHDOG_SEC = 10
+    WATCHDOG_INTERVAL = 4
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
     TC_REQUEST_LENGTH = 4  # for json encoded objects
     TC_ACK_LENGTH = 4
@@ -1021,7 +1021,8 @@ class Server (TC):
         msg = "stopping TC Server for controller %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.disconnect()
-        self._watchdog_timer.cancel()
+        if self._watchdog_timer:
+            self._watchdog_timer.cancel()
         if self._relays.isAlive():
             self._relays.stop()
             self._relays.join()
@@ -1323,7 +1324,7 @@ def main(argv):
     if watchdog_pid and watchdog_pid.isdigit():
         myTC.watchdog_pid = int(watchdog_pid)
     if watchdog_usec and watchdog_usec.isdigit():
-        myTC.watchdog_sec = watchdog_usec // 1000
+        myTC.watchdog_sec = int(watchdog_usec) // 1000
 
     signal.signal(signal.SIGTERM, myTC.signal_handler)
     signal.signal(signal.SIGINT, myTC.signal_handler)
