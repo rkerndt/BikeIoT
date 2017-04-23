@@ -1305,26 +1305,18 @@ def main(argv):
     """
 
     USAGE = "TC_server controller_id"
-    watchdog_pid = None
-    watchdog_usec = None
-
-    # get watchdog settings for this process
-    if "WATCHDOG_PID" in os.environ:
-        watchdog_pid = os.environ["WATCHDOG_PID"]
-        print("watchdog pid = %s" % (watchdog_pid,))
-    if "WATCHDOG_USEC" in os.environ:
-        watchdog_usec = os.environ["WATCHDOG_USEC"]
-        print("watchdog usec = %s" % (watchdog_usec,))
 
     if len(argv) != 2:
         print(USAGE, file=sys.stdout)
         sys.exit(0)
 
     myTC = Server(argv[1])
-    if watchdog_pid and watchdog_pid.isdigit():
-        myTC.watchdog_pid = int(watchdog_pid)
-    if watchdog_usec and watchdog_usec.isdigit():
-        myTC.watchdog_sec = int(watchdog_usec) // 1000
+    if ("WATCHDOG_PID" in os.environ) and os.environ["WATCHDOG_PID"].isdigit():
+        myTC.watchdog_pid = int(os.environ["WATCHDOG_PID"])
+        print("watchdog pid = %s" % (myTC.watchdog_pid,))
+    if ("WATCHDOG_USEC" in os.environ) and os.environ["WATCHDOG_USEC"].isdigit():
+        myTC.watchdog_sec = int(os.environ["WATCHDOG_USEC"]) // 1000
+        print("watchdog sec = %s" % (myTC.watchdog_sec,))
 
     signal.signal(signal.SIGTERM, myTC.signal_handler)
     signal.signal(signal.SIGINT, myTC.signal_handler)
