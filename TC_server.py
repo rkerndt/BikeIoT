@@ -961,7 +961,7 @@ class Server (TC):
         self.watchdog_sec = TC.WATCHDOG_SEC
 
         # ctypes
-        self._libsystemd = None
+        self._libsystemd = CDLL("libsystemd.so")
 
     def run(self):
         """
@@ -970,13 +970,18 @@ class Server (TC):
         :return: None
         """
 
+        # tell systemd we are ready
+        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"READY=1\n")
+        if result <= 0:
+            msg = "Error %d sending sd_pid_notify READY" % (result,)
+            self.output_log(msg)
+
         # initialize watchdog
         if self.watchdog_pid:
             if self._debug_level > 2:
                 msg = "Initializing watchdog timer on pid %d and interval %f seconds" % (self.watchdog_pid,
                         self.watchdog_sec/TC.WATCHDOG_INTERVAL)
                 self.output_log(msg)
-            self._libsystemd = CDLL("libsystemd.so")
             self.watchdog()
 
         connected = False
@@ -1021,6 +1026,13 @@ class Server (TC):
         the broker, causing the nework loop_forever to exit.
         :return: None
         """
+
+        # tell systemd that we are stopping
+        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"STOPPING=1\n")
+        if result <= 0:
+            msg = "error %d sd_pid_notify STOPPING"
+            self.output_log(msg)
+            
         msg = "stopping TC Server for controller %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.disconnect()
@@ -1137,8 +1149,8 @@ class Server (TC):
         # load the library at run time using cdll
         #if healthy:
         result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"WATCHDOG=1\n")
-        if result != 0:
-            msg = "Error (%s) in sd_pid_notify";
+        if result <= 0:
+            msg = "Error (%d) in sd_pid_notify" % (result,)
             self.output_log(msg)
         self._watchdog_timer = threading.Timer(self.watchdog_sec/TC.WATCHDOG_INTERVAL, self.watchdog)
         self._watchdog_timer.start()
