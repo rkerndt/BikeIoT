@@ -972,9 +972,11 @@ class Server (TC):
 
         # initialize watchdog
         if self.watchdog_pid:
+            if self._debug_level > 2:
+                msg = "Initializing watchdog timer on pid %d and interval %f seconds" % (self.watchdog_pid,
+                        self.watchdog_sec/TC.WATCHDOG_INTERVAL)
             self._libsystemd = CDLL("libsystemd.so")
-            self._watchdog_timer = threading.Timer(self.watchdog_sec/TC.WATCHDOG_INTERVAL, self.watchdog)
-            self._watchdog_timer.start()
+            self.watchdog()
 
         connected = False
         connection_retry_delay = TC.INITIAL_CONNECTION_RETRY_DELAY
@@ -1122,7 +1124,7 @@ class Server (TC):
         """
 
         if TC._debug_level > 2:
-            msg = "Running watchdog"
+            msg = "Running watchdog for pid %d, timeout in %d seconds" % (self.watchdog_pid, self.watchdog_sec)
             self.output_log(msg)
 
         healthy = True
