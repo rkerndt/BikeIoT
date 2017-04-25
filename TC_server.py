@@ -1310,7 +1310,15 @@ def main(argv):
         print(USAGE, file=sys.stdout)
         sys.exit(0)
 
+
     myTC = Server(argv[1])
+
+    if myTC._debug_level > 2:
+        myPID = os.getpid()
+        print("Process ID = %d" % myPID)
+        myTC.watchdog_pid = myPID
+        myTC.watchdog_sec = 10
+
     if ("WATCHDOG_PID" in os.environ) and os.environ["WATCHDOG_PID"].isdigit():
         myTC.watchdog_pid = int(os.environ["WATCHDOG_PID"])
         print("watchdog pid = %s" % (myTC.watchdog_pid,))
