@@ -975,6 +975,7 @@ class Server (TC):
             if self._debug_level > 2:
                 msg = "Initializing watchdog timer on pid %d and interval %f seconds" % (self.watchdog_pid,
                         self.watchdog_sec/TC.WATCHDOG_INTERVAL)
+                self.output_log(msg)
             self._libsystemd = CDLL("libsystemd.so")
             self.watchdog()
 
@@ -1135,8 +1136,10 @@ class Server (TC):
 
         # load the library at run time using cdll
         #if healthy:
-        self._libsystemd.sd_notify(self.watchdog_pid,0,"WATCHDOG=1\n")
-
+        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"WATCHDOG=1\n")
+        if result != 0:
+            msg = "Error (%s) in sd_pid_notify";
+            self.output_log(msg)
         self._watchdog_timer = threading.Timer(self.watchdog_sec/TC.WATCHDOG_INTERVAL, self.watchdog)
         self._watchdog_timer.start()
 
@@ -1325,7 +1328,7 @@ def main(argv):
         myTC.watchdog_pid = int(os.environ["WATCHDOG_PID"])
         print("watchdog pid = %s" % (myTC.watchdog_pid,))
     if ("WATCHDOG_USEC" in os.environ) and os.environ["WATCHDOG_USEC"].isdigit():
-        myTC.watchdog_sec = int(os.environ["WATCHDOG_USEC"]) // 1000
+        myTC.watchdog_sec = int(os.environ["WATCHDOG_USEC"]) // 1000000
         print("watchdog sec = %s" % (myTC.watchdog_sec,))
 
     signal.signal(signal.SIGTERM, myTC.signal_handler)
