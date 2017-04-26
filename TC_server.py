@@ -292,8 +292,11 @@ class TC:
         :param buf: bytes The actual message
         :return: None
         """
-        msg = "Log message: level %d - %s" % (level, buf)
-        userdata.output_log(msg)
+        if ((userdata.debug_level > 1) and (level in [mqtt.MQTT_LOG_WARNING, mqtt.MQTT_LOG_ERR])) or \
+           ((userdata.debug_level > 2) and (level in [mqtt.MQTT_LOG_INFO, mqtt.MQTT_LOG_NOTICE])) or \
+           ((userdata.debug_level > 3) and (level == mqtt.MQTT_LOG_DEBUG)):
+            msg = "mqtt log message: level %d - %s" % (level, buf)
+            userdata.output_log(msg)
 
     @staticmethod
     def decode_json(mqtt_msg:mqtt.MQTTMessage):
@@ -952,6 +955,7 @@ class Server (TC):
         self.mqttc.on_disconnect = TC.on_disconnect
         self.mqttc.on_subscribe = TC.on_subscribe
         self.mqttc.on_message = TC.on_message
+        self.mqttc.on_log = TC.on_log
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
         self.mqttc.message_callback_add(self.tc_topic, Server.on_topic)
 
