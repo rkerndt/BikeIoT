@@ -978,7 +978,7 @@ class Server (TC):
 
         # initialize watchdog
         if self.watchdog_pid:
-            if self._debug_level > 2:
+            if self.debug_level > 2:
                 msg = "Initializing watchdog timer on pid %d and interval %f seconds" % (self.watchdog_pid,
                         self.watchdog_sec/TC.WATCHDOG_INTERVAL)
                 self.output_log(msg)
@@ -1087,7 +1087,7 @@ class Server (TC):
         else:
             self.mqttc.publish(topic, ack.encode(), TC.DEFAULT_QOS)
 
-        if self._debug_level > 2:
+        if self.debug_level > 2:
             msg = "Sent ACK to %s for message id %d with result %d" % (topic, ack.mid, ack.rc)
             self.output_log(msg)
 
@@ -1136,7 +1136,7 @@ class Server (TC):
         :return: None
         """
 
-        if TC._debug_level > 2:
+        if self.debug_level > 2:
             msg = "Running watchdog for pid %d, timeout in %d seconds" % (self.watchdog_pid, self.watchdog_sec)
             self.output_log(msg)
 
