@@ -959,6 +959,8 @@ class Server (TC):
         self._watchdog_timer = None
         self.watchdog_pid = None
         self.watchdog_sec = TC.WATCHDOG_SEC
+        self._notify_socket_path = None
+        self._notify_socket_fd = None
 
         # ctypes
         self._libsystemd = CDLL("libsystemd.so")
@@ -970,11 +972,19 @@ class Server (TC):
         :return: None
         """
 
+        # open a connecton to the systemd notify socket
+        if self._notify_socket_path:
+            self._notify_socket_fd = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+
+        # try saying we are ready on the socket
+        if self._notify_socket_fd:
+            self._notify_socket_fd.sendall("READY=1".encode('ascii'))
+
         # tell systemd we are ready
-        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"READY=1\n")
-        if result <= 0:
-            msg = "Error %d sending sd_pid_notify READY" % (result,)
-            self.output_log(msg)
+        #result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"READY=1\n")
+        #if result <= 0:
+        #    msg = "Error %d sending sd_pid_notify READY" % (result,)
+        #    self.output_log(msg)
 
         # initialize watchdog
         if self.watchdog_pid:
@@ -1032,7 +1042,7 @@ class Server (TC):
         if result <= 0:
             msg = "error %d sd_pid_notify STOPPING"
             self.output_log(msg)
-            
+
         msg = "stopping TC Server for controller %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.disconnect()
@@ -1336,9 +1346,13 @@ def main(argv):
         myTC.watchdog_pid = myPID
         myTC.watchdog_sec = 10
 
+    if ("NOTIFY_SOCKET" in os.environ):
+        myTC._notify_socket_path = os.environ["NOTIFY_SOCKET"]
+
     if ("WATCHDOG_PID" in os.environ) and os.environ["WATCHDOG_PID"].isdigit():
         myTC.watchdog_pid = int(os.environ["WATCHDOG_PID"])
         print("watchdog pid = %s" % (myTC.watchdog_pid,))
+        
     if ("WATCHDOG_USEC" in os.environ) and os.environ["WATCHDOG_USEC"].isdigit():
         myTC.watchdog_sec = int(os.environ["WATCHDOG_USEC"]) // 1000000
         print("watchdog sec = %s" % (myTC.watchdog_sec,))
