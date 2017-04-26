@@ -960,7 +960,7 @@ class Server (TC):
         self.watchdog_pid = None
         self.watchdog_sec = TC.WATCHDOG_SEC
         self._notify_socket_path = None
-        self._notify_socket_fd = None
+        self._notify_socket = None
 
         # ctypes
         self._libsystemd = CDLL("libsystemd.so")
@@ -973,18 +973,19 @@ class Server (TC):
         """
 
         # open a connecton to the systemd notify socket
-        if self._notify_socket_path:
-            self._notify_socket_fd = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        #if self._notify_socket_path:
+        #    self._notify_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        #    self._notify_socket.connect(self._notify_socket_path)
 
         # try saying we are ready on the socket
-        if self._notify_socket_fd:
-            self._notify_socket_fd.sendall("READY=1".encode('ascii'))
+        #if self._notify_socket:
+        #    self._notify_socket.sendall("READY=1".encode('ascii'))
 
-        # tell systemd we are ready
-        #result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"READY=1\n")
-        #if result <= 0:
-        #    msg = "Error %d sending sd_pid_notify READY" % (result,)
-        #    self.output_log(msg)
+        #tell systemd we are ready
+        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"READY=1".encode('ascii'))
+        if result <= 0:
+            msg = "Error %d sending sd_pid_notify READY" % (result,)
+            self.output_log(msg)
 
         # initialize watchdog
         if self.watchdog_pid:
@@ -1038,7 +1039,7 @@ class Server (TC):
         """
 
         # tell systemd that we are stopping
-        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"STOPPING=1\n")
+        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"STOPPING=1".encode('ascii'))
         if result <= 0:
             msg = "error %d sd_pid_notify STOPPING"
             self.output_log(msg)
@@ -1158,7 +1159,7 @@ class Server (TC):
 
         # load the library at run time using cdll
         #if healthy:
-        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"WATCHDOG=1\n")
+        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"WATCHDOG=1".encode('ascii'))
         if result <= 0:
             msg = "Error (%d) in sd_pid_notify" % (result,)
             self.output_log(msg)
@@ -1352,7 +1353,7 @@ def main(argv):
     if ("WATCHDOG_PID" in os.environ) and os.environ["WATCHDOG_PID"].isdigit():
         myTC.watchdog_pid = int(os.environ["WATCHDOG_PID"])
         print("watchdog pid = %s" % (myTC.watchdog_pid,))
-        
+
     if ("WATCHDOG_USEC" in os.environ) and os.environ["WATCHDOG_USEC"].isdigit():
         myTC.watchdog_sec = int(os.environ["WATCHDOG_USEC"]) // 1000000
         print("watchdog sec = %s" % (myTC.watchdog_sec,))
