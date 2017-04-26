@@ -79,7 +79,7 @@ class TC:
     _bind_address = "100.81.111.18"
     _default_phase_map = { 1:2, 2:3, 3:4, 4:5 } # phase:pin
     _phase_dwell = 0.1
-    _debug_level = 3
+    _debug_level = 2
 
     # general payload formats
     _payload_type_format = '!i'
@@ -955,14 +955,12 @@ class Server (TC):
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
         self.mqttc.message_callback_add(self.tc_topic, Server.on_topic)
 
-        # watchdog timer
+        # watchdog timer, set watchdog_pid iff running with systemd type=notify
         self._watchdog_timer = None
         self.watchdog_pid = None
         self.watchdog_sec = TC.WATCHDOG_SEC
-        self._notify_socket_path = None
-        self._notify_socket = None
 
-        # ctypes
+        # load needed dynamic libraries
         self._libsystemd = CDLL("libsystemd.so")
 
     def run(self):
@@ -971,15 +969,6 @@ class Server (TC):
         TODO: Needs some error handling, response to connect and subscribe. What happens if client disconnects?
         :return: None
         """
-
-        # open a connecton to the systemd notify socket
-        #if self._notify_socket_path:
-        #    self._notify_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        #    self._notify_socket.connect(self._notify_socket_path)
-
-        # try saying we are ready on the socket
-        #if self._notify_socket:
-        #    self._notify_socket.sendall("READY=1".encode('ascii'))
 
         #tell systemd we are ready
         result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"READY=1".encode('ascii'))
@@ -1141,9 +1130,9 @@ class Server (TC):
     def watchdog(self):
         """
         Method sends 'heartbeat' to sd_notfiy(3). When run from systemd will cause system to restart the service.
-        This should be called with a period <= WatchdogSec/3. (see systemd.serive(8))
+        This should be called with a period <= WatchdogSec/3. (see systemd.service(8))
 
-        Add features to the method to check on status and take corrective actions as needed.
+        Add features to the method to check on thread status and take corrective actions as needed.
         :return: None
         """
 
@@ -1152,14 +1141,16 @@ class Server (TC):
             self.output_log(msg)
 
         healthy = True
+        result = 0
 
         # check if children are still alive
         if not self._relays.is_alive():
             healthy = False
 
         # load the library at run time using cdll
-        #if healthy:
-        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"WATCHDOG=1".encode('ascii'))
+        if healthy:
+            result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"WATCHDOG=1".encode('ascii'))
+
         if result <= 0:
             msg = "Error (%d) in sd_pid_notify" % (result,)
             self.output_log(msg)
@@ -1346,9 +1337,6 @@ def main(argv):
         print("Process ID = %d" % myPID)
         myTC.watchdog_pid = myPID
         myTC.watchdog_sec = 10
-
-    if ("NOTIFY_SOCKET" in os.environ):
-        myTC._notify_socket_path = os.environ["NOTIFY_SOCKET"]
 
     if ("WATCHDOG_PID" in os.environ) and os.environ["WATCHDOG_PID"].isdigit():
         myTC.watchdog_pid = int(os.environ["WATCHDOG_PID"])
