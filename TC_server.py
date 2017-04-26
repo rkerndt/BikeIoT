@@ -58,7 +58,6 @@ class TC:
     CHECK_PHASE_TIMEOUT_INTERVAL = 4
     PHASE_ON =  0x01
     PHASE_OFF = 0x00
-    WATCHDOG_SEC = 10
     WATCHDOG_INTERVAL = 4
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
     TC_REQUEST_LENGTH = 4  # for json encoded objects
@@ -75,7 +74,7 @@ class TC:
     _tc_topic_format = _topic_base + '%s'
     _broker_url = 'mqtt.eug.kerndt.com'  #iot.eclipse.org or test.mosquitto.org
     _broker_port = 1883
-    _broker_keepalive = 60
+    _broker_keepalive = 10
     _bind_address = "100.81.111.18"
     _default_phase_map = { 1:2, 2:3, 3:4, 4:5 } # phase:pin
     _phase_dwell = 0.1
@@ -89,8 +88,9 @@ class TC:
 
 
     def __init__(self):
-        #self.lock = threading.Lock()
+
         self.debug_level = TC._debug_level
+        self._healthy = False
 
     def output_msg(self, msg:str, stream):
         """
@@ -167,7 +167,8 @@ class TC:
         :return: None
         """
 
-        log_msg = None
+        userdata._healthy = True
+
         try:
             if msg:
                 type = TC.get_type(msg.payload)
@@ -203,6 +204,7 @@ class TC:
         :param rc: int connection result
         :return: None
         """
+        userdata._healthy = True
         rc_string = mqtt.connack_string(rc)
         msg = "Connection response: %s" % (rc_string)
         userdata.output_log(msg)
@@ -217,6 +219,7 @@ class TC:
         :param rc: int disconnect result
         :return: None
         """
+        userdata._healthy = False
         msg = "Disconnected from broker: %s" % mqtt.error_string(rc)
         userdata.output_log(msg)
 
@@ -231,6 +234,7 @@ class TC:
         :param mqtt_msg: MQTTMessage
         :return: None
         """
+        userdata._healthy = True
         if userdata.debug_level > 0:
             msg = "[%s: %s] %s" % (msg.mid, msg.topic, msg.payload)
             userdata.output_log(msg)
@@ -249,6 +253,7 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
+        userdata._healthy = True
         if userdata.debug_level > 0:
             msg = "published message id %d" % (mqtt_mid,)
             userdata.output_log(msg)
@@ -264,7 +269,7 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
-
+        userdata._healthy = True
         msg = "Subscribe granted on message_id %s with qos %s" % (mqtt_mid, str(granted_qos))
         userdata.output_log(msg)
 
@@ -278,6 +283,7 @@ class TC:
         :param mqtt_mid: MQTTMessage.mid
         :return: None
         """
+        userdata._healthy = True
         msg = "Unsubscribe acknowledged on message_id %s" % (mqtt_mid,)
         userdata.output_log(msg)
 
@@ -292,6 +298,12 @@ class TC:
         :param buf: bytes The actual message
         :return: None
         """
+
+        # set healthy when receive a PINGRESP
+        if (level == mqtt.MQTT_LOG_DEBUG) and ("PINGRESP" in buf):
+            userdata._healthy = True
+
+        # log according to debug_level
         if ((userdata.debug_level > 1) and (level in [mqtt.MQTT_LOG_WARNING, mqtt.MQTT_LOG_ERR])) or \
            ((userdata.debug_level > 2) and (level in [mqtt.MQTT_LOG_INFO, mqtt.MQTT_LOG_NOTICE])) or \
            ((userdata.debug_level > 3) and (level == mqtt.MQTT_LOG_DEBUG)):
@@ -962,7 +974,7 @@ class Server (TC):
         # watchdog timer, set watchdog_pid iff running with systemd type=notify
         self._watchdog_timer = None
         self.watchdog_pid = None
-        self.watchdog_sec = TC.WATCHDOG_SEC
+        self.watchdog_sec = None
 
         # load needed dynamic libraries
         self._libsystemd = CDLL("libsystemd.so")
@@ -981,7 +993,7 @@ class Server (TC):
             self.output_log(msg)
 
         # initialize watchdog
-        if self.watchdog_pid:
+        if self.watchdog_pid and self.watchdog_sec:
             if self.debug_level > 2:
                 msg = "Initializing watchdog timer on pid %d and interval %f seconds" % (self.watchdog_pid,
                         self.watchdog_sec/TC.WATCHDOG_INTERVAL)
@@ -1144,15 +1156,14 @@ class Server (TC):
             msg = "Running watchdog for pid %d, timeout in %d seconds" % (self.watchdog_pid, self.watchdog_sec)
             self.output_log(msg)
 
-        healthy = True
         result = 0
 
         # check if children are still alive
         if not self._relays.is_alive():
-            healthy = False
+            self._healthy = False
 
         # load the library at run time using cdll
-        if healthy:
+        if self._healthy:
             result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"WATCHDOG=1".encode('ascii'))
 
         if result <= 0:
@@ -1160,6 +1171,7 @@ class Server (TC):
             self.output_log(msg)
         self._watchdog_timer = threading.Timer(self.watchdog_sec/TC.WATCHDOG_INTERVAL, self.watchdog)
         self._watchdog_timer.start()
+        self._healthy = False
 
     def signal_handler(self, signum, frame):
         """

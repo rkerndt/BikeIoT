@@ -7,9 +7,9 @@
     After=network.target
 
 [Service]
-    Type=idle
+    Type=notify
     KillMode=process
-    WatchdogSec=3
+    WatchdogSec=60
     Restart=on_watchdog
     ExecStart=/usr/bin/python3 /home/pi/TC_server.py beacon_1.cs.uoregon.edu
 
