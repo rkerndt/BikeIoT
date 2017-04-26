@@ -79,7 +79,7 @@ class TC:
     _bind_address = "100.81.111.18"
     _default_phase_map = { 1:2, 2:3, 3:4, 4:5 } # phase:pin
     _phase_dwell = 0.1
-    _debug_level = 2
+    _debug_level = 3
 
     # general payload formats
     _payload_type_format = '!i'
@@ -1140,7 +1140,7 @@ class Server (TC):
         :return: None
         """
 
-        if self.debug_level > 2:
+        if self.debug_level > 3:
             msg = "Running watchdog for pid %d, timeout in %d seconds" % (self.watchdog_pid, self.watchdog_sec)
             self.output_log(msg)
 
