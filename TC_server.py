@@ -1149,8 +1149,6 @@ class Server (TC):
         :return: None
         """
 
-        userdata.output_log(msg)
-
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
             tc_cmd = TC.decode(mqtt_msg)
