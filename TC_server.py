@@ -311,6 +311,38 @@ class TC:
             userdata.output_log(msg)
 
     @staticmethod
+    def decode(mqtt_msg:mqtt.MQTTMessage):
+        """
+        Checks whether mqtt message encodes a valid TC object. Attempts to first find a matching c_struct object to
+        decode and where that fails attempts to decode as a json object by calling TC.decode_json.
+        :param mqtt_msg: MQTTMessage
+        :return: TC_Identifier derived object
+        """
+
+        tc_command = None
+
+        try:
+            tc_type = TC.get_type(mqtt_msg.payload)
+            if tc_type in [TC.WILL, TC.ID]:
+                tc_command = TC_Identifier.decode(mqtt_msg)
+            elif tc_type == TC.ACK:
+                tc_command = TC_ACK.decode(mqtt_msg)
+            elif tc_type == TC.PHASE_REQUEST:
+                tc_command = TC_Request.decode((mqtt_msg))
+            elif tc_type == TC.PHASE_REQUEST_ON:
+                tc_command = TC_Request_On.decode(mqtt_msg)
+            elif tc_type == TC.PHASE_REQUEST_OFF:
+                tc_command = TC_Request_Off.decode(mqtt_msg)
+            else:
+                raise TC_Exception("No matching command type")
+
+        except TC_Exception as err:
+            # try to decode as json object
+            tc_command = TC.decode_json(mqtt_msg)
+
+        return tc_command
+
+    @staticmethod
     def decode_json(mqtt_msg:mqtt.MQTTMessage):
         """
         Decodes into a dictionary checks whether "type" key is present and then passes onto appropriate TC request class
@@ -1117,28 +1149,17 @@ class Server (TC):
         :return: None
         """
 
-        msg = "received message id %s on topic %s" % (mqtt_msg.mid, mqtt_msg.topic)
         userdata.output_log(msg)
 
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
-            request_type = Server.get_type(mqtt_msg.payload)
-            if request_type == TC.PHASE_REQUEST_ON:
-                request = TC_Request_On.decode(mqtt_msg)
-                userdata.request_phase(request)
-            elif request_type == TC.PHASE_REQUEST_OFF:
-                request = TC_Request_Off.decode(mqtt_msg)
-                userdata.request_phase(request)
-            elif request_type == TC.ID:
-                tc_cmd = TC_Identifier.decode(mqtt_msg)
+            tc_cmd = TC.decode(mqtt_msg)
+            if tc_cmd.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_ON]:
+                userdata.request_phase(tc_cmd)
+            elif tc_cmd.type == TC.ID:
                 userdata.send_ack(tc_cmd, TC_ACK.OK)
             else:
-                # try decoding as a json encoded string
-                tc_cmd = Server.decode_json(mqtt_msg)
-                if tc_cmd.type == TC.ACK:
-                    userdata.send_ack(tc_cmd, TC_ACK.OK)
-                else:
-                    userdata.request_phase(tc_cmd)
+                raise TC_Exception("Received unexpected tc command type %d" % (tc_cmd.type))
         except TC_Exception as err:
             userdata.output_error(err.msg)
 
