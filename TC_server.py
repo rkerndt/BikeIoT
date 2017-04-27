@@ -1152,7 +1152,7 @@ class Server (TC):
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
             tc_cmd = TC.decode(mqtt_msg)
-            if tc_cmd.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_ON]:
+            if tc_cmd.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
                 userdata.request_phase(tc_cmd)
             elif tc_cmd.type == TC.ID:
                 userdata.send_ack(tc_cmd, TC_ACK.OK)
