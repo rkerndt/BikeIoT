@@ -48,6 +48,28 @@ class TC:
     ACK = 0x04
     ID = 0x05
 
+    # Admin Message Types
+    ADMIN_REBOOT = 0x100
+    ADMIN_WIFI_ENABLE = 0x101
+    ADMIN_WIFI_DISABLE = 0x102
+    ADMIN_UPGRADE = 0x103
+
+
+    # acknowledgement result codes
+    OK = 0x00
+    INVALID_PHASE = 0x01
+
+    # Result codes
+    ACK_OK = 0x00
+    ACK_INVALID_PHASE = 0x01
+    ACK_INVALID_CMD = 0x02
+    ACK_UNKNOWN_ERR = 0xFF
+    RESULT_CODES = { ACK_OK: 'OK',
+                     ACK_INVALID_PHASE: 'Invalid Phase Number',
+                     ACK_INVALID_CMD: 'Invalid command type',
+                     ACK_UNKNOWN_ERR: 'Failed, unknown error'}
+
+
     # Constants
     MAX_PHASE_ON_SECS = 0x30
     CONNECTION_RETRY_FACTOR = 2
@@ -70,8 +92,10 @@ class TC:
     # configuration: TODO: put this stuff into a configuration file
     _qos = 2
     _topic_base = 'tc/'
+    _admin_base = _topic_base + 'admin/'
     _will_topic =  _topic_base + 'will'
     _tc_topic_format = _topic_base + '%s'
+    _tc_admin_format = _admin_base + '%s'
     _broker_url = 'mqtt.eug.kerndt.com'  #iot.eclipse.org or test.mosquitto.org
     _broker_port = 1883
     _broker_keepalive = 10
@@ -83,8 +107,6 @@ class TC:
     # general payload formats
     _payload_type_format = '!i'
     _payload_type_length = struct.calcsize(_payload_type_format)
-
-    # encodings
 
 
     def __init__(self):
@@ -445,7 +467,7 @@ class TC_Identifier(TC_Type):
         """
         id_bytes = self.id.encode('utf-8')
         if len(id_bytes) > TC.MAX_ID_BYTES:
-            msg = "user id<%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
+            msg = "user id <%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
         packed = struct.pack(TC_Identifier._struct_format, self.type, id_bytes)
         return bytearray(packed)
@@ -688,12 +710,6 @@ class TC_ACK(TC_Identifier):
     TC_ACK provides acknowledgement that referenced command suceeded
     """
 
-    # acknowledgement result codes
-    OK = 0x00
-    INVALID_PHASE = 0x01
-    RESULT_CODES = { OK: 'OK',
-                     INVALID_PHASE: 'Invalid Phase Number'}
-
     _struct_format = '!i%dsii' % (TC.MAX_ID_BYTES,)
     _struct_size = struct.calcsize(_struct_format)
 
@@ -708,7 +724,7 @@ class TC_ACK(TC_Identifier):
         super().__init__(TC.ACK, user_id)
         self.mid = mid
         self.rc = None
-        if result_code in TC_ACK.RESULT_CODES:
+        if result_code in TC.RESULT_CODES:
             self.rc = result_code
         else:
             raise TC_Exception("Result code %d out of range" % (result_code,))
@@ -798,7 +814,71 @@ class TC_ACK(TC_Identifier):
         Human readable string
         :return: string
         """
-        msg = "Acknowledgement to %s for message id %d with result %s" % (self.id, self.mid, TC_ACK.RESULT_CODES[self.rc])
+        msg = "Acknowledgement to %s for message id %d with result %s" % (self.id, self.mid, TC.RESULT_CODES[self.rc])
+        return msg
+
+
+class TC_Admin(TC_Identifier):
+    """
+    Base class for administration commands where want to require an action but do not need to provide input
+    """
+
+    _struct_format = '!i%ds%ds' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
+    _struct_size = struct.calcsize(_struct_format)
+
+    def __init__(self, tc_cmd:int, user_id:str, controller_id:str):
+        """
+        
+        :param tc_cmd: int
+        :param user_id: str - id of user sending the command
+        :param controller_id: str - target machine for command execution
+        """
+        super().__init__(tc_cmd, user_id)
+        self.controller_id = controller_id
+
+    def encode(self):
+        """
+        Converts into a bytes object representation of this c structure:
+        struct TC_ADMIN {
+            int type;
+            char id[TC.MAX_ID_BYTES];
+            char controller_id[TC.MAX_ID_BYTES]
+        :return: bytearray
+        """
+
+        id_bytes = self.id.encode('utf-8')
+        if len(id_bytes) > TC.MAX_ID_BYTES:
+            msg = "user id <%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
+            raise TC_Exception(msg)
+        controller_id_bytes = self.controller_id.encode('utf-8')
+        if len(controller_id_bytes) > TC.MAX_ID_BYTES:
+            msg = "controller id <%s> exceeds %d utf-8 bytes" % (self.controller_id, TC.MAX_ID_BYTES)
+            raise TC_Exception(msg)
+        packed = struct.pack(TC_Admin._struct_format, self.type, id_bytes, controller_id_bytes)
+        return bytearray(packed)
+
+    @classmethod
+    def decode(cls, msg:mqtt.MQTTMessage):
+        """
+        Creates a TC_Admin objec from bytes object which should have been packed using TC_Admin.encode()
+        :param msg: MQTTMessage
+        :return: TC_Admin
+        """
+        if len(msg.payload) < TC_Admin._struct_size:
+            msg = 'improperly formatted TC Admin payload'
+            raise TC_Exception(msg)
+        type, id_bytes, controller_id_bytes = struct.unpack_from(TC_Admin._struct_format, msg.payload, 0)
+        id = id_bytes.decode()
+        controller_id = controller_id_bytes.decode()
+        admin_cmd = TC_Admin(type, id, controller_id)
+        return admin_cmd
+
+    def __str__(self):
+        """
+        Return a human readable form
+        :return: str
+        """
+        msg = "User %s executing command %d on %s" % (self.id, self.type, self.controller_id)
         return msg
 
 
@@ -1097,7 +1177,7 @@ class Server (TC):
         :return: None
         """
 
-        rc = TC_ACK.OK
+        rc = TC.ACK_OK
 
         if request.phase in self.phases:
             if request.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
@@ -1114,7 +1194,7 @@ class Server (TC):
         else:
             msg = "received an invalid phase number %d" % (request.phase,)
             self.output_error(msg)
-            rc = TC_ACK.INVALID_PHASE
+            rc = TC.ACK_INVALID_PHASE
 
         # send ack
         self.send_ack(request, rc)
@@ -1155,7 +1235,7 @@ class Server (TC):
             if tc_cmd.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
                 userdata.request_phase(tc_cmd)
             elif tc_cmd.type == TC.ID:
-                userdata.send_ack(tc_cmd, TC_ACK.OK)
+                userdata.send_ack(tc_cmd, TC.ACK_OK)
             else:
                 raise TC_Exception("Received unexpected tc command type %d" % (tc_cmd.type))
         except TC_Exception as err:
