@@ -717,7 +717,7 @@ class TC_ACK(TC_Identifier):
     _struct_size = struct.calcsize(_struct_format)
 
 
-    def __init__(self, user_id, mid, result_code):
+    def __init__(self, user_id:str, mid:int, result_code:int):
         """
 
         :param user_id:
@@ -874,6 +874,9 @@ class TC_Admin(TC_Identifier):
         id = id_bytes.decode()
         controller_id = controller_id_bytes.decode()
         admin_cmd = TC_Admin(type, id, controller_id)
+        admin_cmd._encoding = TC.ENCODING_C_STRUC
+        admin_cmd._src_mid = msg.mid
+
         return admin_cmd
 
     def __str__(self):
@@ -1270,7 +1273,7 @@ class Server (TC):
             # check that command is intended for this server
             if tc_cmd.controller_id != userdata.id:
                 rc = TC.ACK_INVALID_CMD
-                msg = 'Received command type %d intended for controler %s' % (tc_cmd.type, tc_cmd.controller_id)
+                msg = 'Received command type %d intended for controller %s' % (tc_cmd.type, tc_cmd.controller_id)
                 raise TC_Exception(msg)
 
             if tc_cmd.type == TC.ADMIN_REBOOT:
