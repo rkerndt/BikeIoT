@@ -21,6 +21,7 @@ from io import StringIO
 import json
 from ctypes import *
 import os
+import subprocess
 
 class TC_Exception (Exception):
     """
@@ -1059,6 +1060,7 @@ class Server (TC):
         super().__init__()
         self.id = controller_id
         self.tc_topic = TC._tc_topic_format % (self.id,)
+        self.admin_topic = TC._tc_admin_format % (self.id,)
         self.phase_to_gpio = dict(map)
         self.phases = frozenset(self.phase_to_gpio.keys())
 
@@ -1082,6 +1084,7 @@ class Server (TC):
         self.mqttc.on_log = TC.on_log
         self.mqttc.message_callback_add(TC._will_topic, Server.on_will)
         self.mqttc.message_callback_add(self.tc_topic, Server.on_topic)
+        self.mqttc.message_callback_add(self.admin_topic, Server.on_admin)
 
         # watchdog timer, set watchdog_pid iff running with systemd type=notify
         self._watchdog_timer = None
@@ -1090,6 +1093,11 @@ class Server (TC):
 
         # load needed dynamic libraries
         self._libsystemd = CDLL("libsystemd.so")
+
+        # external program/script calls for system admin functions
+        self._enable_adhoc_wifi = ["/sbin/ifup", "wlan0"]
+        self._disable_adhoc_wifi = ["/sbin/ifdown", "wlan0"]
+        self._system_reboot = ["/sbin/shutdown", "--reboot", "+1"]
 
     def run(self):
         """
@@ -1141,7 +1149,7 @@ class Server (TC):
                 exit(1)
 
         # subscribe to own controller_id topic and will topic to get messages intended for me
-        self.mqttc.subscribe([(self.tc_topic, TC._qos), (TC._will_topic, TC._qos)])
+        self.mqttc.subscribe([(self.tc_topic, TC._qos), (TC._will_topic, TC._qos), (self.admin_topic, TC._qos)])
 
         # enter network loop forever, relying on interrupt handler to stop things
         self._relays.start()
@@ -1240,6 +1248,63 @@ class Server (TC):
                 raise TC_Exception("Received unexpected tc command type %d" % (tc_cmd.type))
         except TC_Exception as err:
             userdata.output_error(err.msg)
+
+    @staticmethod
+    def on_admin(client:mqtt.Client, userdata, msg:mqtt.MQTTMessage):
+        """
+        Callback function to process admin commands
+        :param client: 
+        :param userdata: 
+        :param msg: 
+        :return: 
+        """
+
+        tc_cmd = None
+        rc = TC.ACK_OK
+
+        try:
+            tc_cmd = TC.decode(msg)
+
+            # check that command is intended for this server
+            if tc_cmd.controller_id != userdata.id:
+                rc = TC.ACK_INVALID_CMD
+                msg = 'Received command type %d intended for controler %s' % (tc_cmd.type, tc_cmd.controller_id)
+                raise TC_Exception(msg)
+
+            if tc_cmd.type == TC.ADMIN_REBOOT:
+                result = userdata._run_system_command(tc_cmd, userdata._system_reboot)
+                if result.returncode == 0:
+                    sleep(10)
+                    userdata.stop()
+            elif tc_cmd.type == TC.ADMIN_WIFI_ENABLE:
+                userdata._run_system_command(tc_cmd, userdata._enable_adhoc_wifi)
+            elif tc_cmd.type == TC.ADMIN_WIFI_DISABLE:
+                userdata._run_system_command(tc_cmd, userdata._disable_adhoc_wifi)
+            else:
+                raise TC_Exception('Unexpected command type %d' % tc_cmd.type)
+
+        except TC_Exception as err:
+            if tc_cmd:
+                if rc == TC.ACK_OK:
+                    rc = TC.ACK_UNKNOWN_ERR
+                userdata.send_ack(tc_cmd, rc)
+            userdata.output_error(err.msg)
+
+
+    def _run_system_command(self, tc_cmd:TC_Identifier, args:list):
+        """
+        Executes command using subprocess.run() sending ack on success or failure
+        :param tc_cmd: TC_Identifier
+        :param args: list - args[0] is executable path; args[1:] are arguments to executable
+        :return: result: CompletedProcess
+        """
+        result = subprocess.run(args)
+        if result.returncode == 0:
+            self.send_ack(tc_cmd, TC.ACK_OK)
+        else:
+            self.send_ack(tc_cmd, TC.ACK_UNKNOWN_ERR)
+
+        return result
 
 
     def watchdog(self):
