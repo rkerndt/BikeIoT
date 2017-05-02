@@ -1272,8 +1272,11 @@ class Server (TC):
 
             # check that command is intended for this server
             if tc_cmd.controller_id != userdata.id:
+                for n,char in enumerate(tc_cmd.controller_id):
+                    if char != userdata.id[n]:
+                        print("<%s> != <%s>" % (char, userdata.id[n]))
                 rc = TC.ACK_INVALID_CMD
-                msg = 'Received command type %d intended for controller %s' % (tc_cmd.type, tc_cmd.controller_id)
+                msg = '%s received command type %d intended for controller %s' % (userdata.id, tc_cmd.type, tc_cmd.controller_id)
                 raise TC_Exception(msg)
 
             if tc_cmd.type == TC.ADMIN_REBOOT:
@@ -1491,7 +1494,7 @@ class User(TC):
             userdata._ack_event.set()
             if userdata._wait_for_ack:
                 myACK = TC_ACK.decode(mqtt_msg)
-                msg = "Received ACK on mid %d on command %d" % (myACK.mid, myACK.rc)
+                msg = "Received ACK for mid %d with result code (%d) %s" % (myACK.mid, myACK.rc, TC.RESULT_CODES[myACK.rc])
                 userdata.output_log(msg)
         else:
             msg = "Received type %d on %s" % (type, mqtt_msg.topic)
