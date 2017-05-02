@@ -61,13 +61,13 @@ while True:
             if count > 1:
                 print("Averge RTT of %d returned = %f seconds" % (sum_count, sum/sum_count))
         elif commands[0] == 'reboot' and len(commands) == 2:
-            tc_cmd = TC.TC_Admin(TC.TC.ADMIN_REBOOT, commands[1])
+            tc_cmd = TC.TC_Admin(TC.TC.ADMIN_REBOOT, myUserID, commands[1])
             myUser.mqttc.publish(TC.TC._tc_admin_format % commands[1], tc_cmd.encode(), TC.TC._qos)
         elif commands[0] == 'wifi' and len(commands) == 2 and commands[1] == 'enable':
-            tc_cmd = TC.TC_Admin(TC.TC.ADMIN_WIFI_ENABLE, controllerID)
+            tc_cmd = TC.TC_Admin(TC.TC.ADMIN_WIFI_ENABLE, myUserID, controllerID)
             myUser.mqttc.publish(TC.TC._tc_admin_format % controllerID, tc_cmd.encode(), TC.TC._qos)
         elif commands[0] == 'wifi' and len(commands) == 2 and commands[1] == 'disable':
-            tc_cmd = TC.TC_Admin(TC.TC.ADMIN_WIFI_DISABLE, controllerID)
+            tc_cmd = TC.TC_Admin(TC.TC.ADMIN_WIFI_DISABLE, myUserID, controllerID)
             myUser.mqttc.publish(TC.TC._tc_admin_format % controllerID, tc_cmd.encode(), TC.TC._qos)
         else:
             print(USAGE)

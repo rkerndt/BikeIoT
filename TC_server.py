@@ -356,6 +356,8 @@ class TC:
                 tc_command = TC_Request_On.decode(mqtt_msg)
             elif tc_type == TC.PHASE_REQUEST_OFF:
                 tc_command = TC_Request_Off.decode(mqtt_msg)
+            elif tc_type in [TC.ADMIN_REBOOT, TC.ADMIN_WIFI_ENABLE, TC.ADMIN_WIFI_DISABLE]:
+                tc_command = TC_Admin.decode(mqtt_msg)
             else:
                 raise TC_Exception("No matching command type")
 
@@ -379,7 +381,7 @@ class TC:
         payload_dict = json.load(payload_stream)
         if "type" in payload_dict:
             type = payload_dict["type"]
-            if type == TC.PHASE_REQUEST_ON or type == TC.PHASE_REQUEST_OFF:
+            if type in [TC.PHASE_REQUEST, TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
                 request = TC_Request.json_load(payload_dict)
             elif type == TC.ACK:
                 request = TC_ACK.json_load(payload_dict)
