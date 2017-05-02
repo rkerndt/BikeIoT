@@ -9,5 +9,11 @@ iface lo inet loopback
 iface eth0 inet manual
 iface eth1 inet manual
 
-iface wlan0 inet manual
-    wpa-conf /etc/wpa_supplicant/wpa_supplicant.conf
+iface wlan0 inet static
+    wireless-mode ad-hoc
+    wireless-channel 6
+    wireless-key restricted [1] <10 digit hex key>
+    address 192.168.66.1
+    netmask 255.255.255.0
+    broadcast 192.168.66.255
+    
