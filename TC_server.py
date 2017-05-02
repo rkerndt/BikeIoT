@@ -1382,6 +1382,7 @@ class User(TC):
 
         # event set when ACK received
         self._ack_event = threading.Event()
+        self._wait_for_ack = False
 
     def start(self):
         """
@@ -1483,6 +1484,10 @@ class User(TC):
         type = TC.get_type(mqtt_msg.payload)
         if type == TC.ACK:
             userdata._ack_event.set()
+            if userdata._wait_for_ack:
+                myACK = TC_ACK.decode(mqtt_msg)
+                msg = "Received ACK on mid %d on command %d" % (myACK.mid, myACK.rc)
+                userdata.output_log(msg)
         else:
             msg = "Received type %d on %s" % (type, mqtt_msg.topic)
             userdata.output_log(msg)
