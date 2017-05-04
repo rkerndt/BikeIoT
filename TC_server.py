@@ -487,7 +487,7 @@ class TC_Identifier(TC_Type):
             msg = 'improperly formatted TC Will payload'
             raise TC_Exception(msg)
         type, id_bytes = struct.unpack_from(TC_Identifier._struct_format, msg.payload, 0)
-        id = id_bytes.decode()
+        id = id_bytes.decode('utf-8').rstrip('\0')
         myID = TC_Identifier(type, id)
         myID._encoding = TC.ENCODING_C_STRUC
         myID._src_mid = msg.mid
@@ -563,8 +563,8 @@ class TC_Request(TC_Identifier):
         if type != TC.PHASE_REQUEST:
             msg = 'payload claimed to be a phase request but received code (%d)' % type
             raise TC_Exception(msg)
-        user_id = user_id_bytes.decode()
-        controller_id = controller_id_bytes.decode()
+        user_id = user_id_bytes.decode('utf-8').rstrip('\0')
+        controller_id = controller_id_bytes.decode('utf-8').rstrip('\0')
 
         myRequest = TC_Request(user_id, controller_id, phase)
         myRequest._encoding = TC.ENCODING_C_STRUC
@@ -581,7 +581,7 @@ class TC_Request(TC_Identifier):
         # fist stuff object attributes into a dictionary
         json_dict = {}
         json_dict['type'] = self.type
-        json_dict['id'] = self.id
+        json_dict['id'] = self.idim
         json_dict['controller_id'] = self.controller_id
         json_dict['phase'] =self.phase
         json.dump(json_dict, fs)
@@ -657,8 +657,8 @@ class TC_Request_On(TC_Request):
         if type != TC.PHASE_REQUEST_ON:
             msg = 'payload claimed to be a phase request on but received code (%d)' % type
             raise TC_Exception(msg)
-        user_id = user_id_bytes.decode()
-        controller_id = controller_id_bytes.decode()
+        user_id = user_id_bytes.decode('utf-8').rstrip('\0')
+        controller_id = controller_id_bytes.decode('utf-8').rstrip('\0')
 
         myRequestOn = TC_Request_On(user_id, controller_id, phase)
         myRequestOn._encoding = TC.ENCODING_C_STRUC
@@ -699,8 +699,8 @@ class TC_Request_Off(TC_Request):
         if type != TC.PHASE_REQUEST_OFF:
             msg = 'payload claimed to be a phase request off but received code (%d)' % type
             raise TC_Exception(msg)
-        user_id = user_id_bytes.decode()
-        controller_id = controller_id_bytes.decode()
+        user_id = user_id_bytes.decode('utf-8').rstrip('\0')
+        controller_id = controller_id_bytes.decode('utf-8').rstrip('\0')
 
         myRequestOff = TC_Request_Off(user_id, controller_id, phase)
         myRequestOff._encoding = TC.ENCODING_C_STRUC
@@ -770,7 +770,7 @@ class TC_ACK(TC_Identifier):
         if type != TC.ACK:
             msg = 'payload claimed to be an ACK but received code (%d)' % type
             raise TC_Exception(msg)
-        user_id = user_id_bytes.decode()
+        user_id = user_id_bytes.decode('utf-8').rstrip('\0')
 
         myACK = TC_ACK(user_id, mid, rc)
         myACK._encoding = TC.ENCODING_C_STRUC
@@ -871,8 +871,8 @@ class TC_Admin(TC_Identifier):
             msg = 'improperly formatted TC Admin payload'
             raise TC_Exception(msg)
         type, id_bytes, controller_id_bytes = struct.unpack_from(TC_Admin._struct_format, msg.payload, 0)
-        id = id_bytes.decode()
-        controller_id = controller_id_bytes.decode()
+        id = id_bytes.decode('utf-8').rstrip('\0')
+        controller_id = controller_id_bytes.decode('utf-8').rstrip('\0')
         admin_cmd = TC_Admin(type, id, controller_id)
         admin_cmd._encoding = TC.ENCODING_C_STRUC
         admin_cmd._src_mid = msg.mid
