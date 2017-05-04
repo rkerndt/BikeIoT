@@ -1373,7 +1373,7 @@ class User(TC):
     User which is going to send traffic controller phase requests
     """
 
-    def __init__(self, user_id:str):
+    def __init__(self, user_id:str, password="BikeIoT"):
         """
 
         :param user_id:str
@@ -1381,12 +1381,13 @@ class User(TC):
         """
         super().__init__()
         self.id = user_id
+        self.password = password
         self.my_topic = TC._tc_topic_format % (self.id,)
         self.mqttc = mqtt.Client(user_id)
         self.qos = TC.DEFAULT_QOS
 
         # using password until we can get TLS setup with user certificates
-        self.mqttc.username_pw_set(self.id, password="BikeIoT")
+        self.mqttc.username_pw_set(self.id, self.password)
 
         # pass reference to self for use in callbacks
         self.mqttc.user_data_set(self)

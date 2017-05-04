@@ -5,6 +5,7 @@ Functions to simplify TC_server testing and demostration
 
 import TC_server as TC
 from datetime import datetime, timedelta
+from getpass import getpass
 
 USAGE = "controller <controller_id>\n"
 USAGE += "ON | OFF <phase>\n"
@@ -14,10 +15,11 @@ USAGE += "wifi enable | disable\n"
 USAGE += '\n'
 
 myUserID = input("Please enter a user id: ")
+myPassword = getpass()
 myBroker = input("Please enter broker url: ")
 controllerID = 'beacon_1.cs.uoregon.edu'
 
-myUser = TC.User(myUserID)
+myUser = TC.User(myUserID, myPassword)
 myUser.debug_level = 0
 myUser._broker_url =  myBroker
 myUser.start()
