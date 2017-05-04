@@ -1281,7 +1281,7 @@ class Server (TC):
 
             if tc_cmd.type == TC.ADMIN_REBOOT:
                 result = userdata._run_system_command(tc_cmd, userdata._system_reboot)
-                if result.returncode == 0:
+                if result == 0:
                     sleep(10)
                     userdata.stop()
             elif tc_cmd.type == TC.ADMIN_WIFI_ENABLE:
@@ -1304,10 +1304,10 @@ class Server (TC):
         Executes command using subprocess.run() sending ack on success or failure
         :param tc_cmd: TC_Identifier
         :param args: list - args[0] is executable path; args[1:] are arguments to executable
-        :return: result: CompletedProcess
+        :return: result: int
         """
-        result = subprocess.run(args)
-        if result.returncode == 0:
+        result = subprocess.call(args)
+        if result == 0:
             self.send_ack(tc_cmd, TC.ACK_OK)
         else:
             self.send_ack(tc_cmd, TC.ACK_UNKNOWN_ERR)
