@@ -85,6 +85,7 @@ class TC:
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
     TC_REQUEST_LENGTH = 4  # for json encoded objects
     TC_ACK_LENGTH = 4
+    COMMAND_TIMEOUT = 10   # number of seconds to wait for tc command to complete before giving up
 
     # encodings
     ENCODING_C_STRUC = 0x100
@@ -1292,10 +1293,7 @@ class Server (TC):
                 raise TC_Exception(msg)
 
             if tc_cmd.type == TC.ADMIN_REBOOT:
-                result = userdata._run_system_command(tc_cmd, userdata._system_reboot)
-                if result == 0:
-                    TC.non_block_sleep(10)
-                    userdata.stop()
+                userdata._run_system_command(tc_cmd, userdata._system_reboot)
             elif tc_cmd.type == TC.ADMIN_WIFI_ENABLE:
                 userdata._run_system_command(tc_cmd, userdata._enable_adhoc_wifi)
             elif tc_cmd.type == TC.ADMIN_WIFI_DISABLE:
@@ -1318,12 +1316,15 @@ class Server (TC):
         :param args: list - args[0] is executable path; args[1:] are arguments to executable
         :return: result: int
         """
+        msg = "running admin command <%s>" % str(args)
+        self.output_log(msg)
         result = subprocess.call(args)
         if result == 0:
             self.send_ack(tc_cmd, TC.ACK_OK)
         else:
             self.send_ack(tc_cmd, TC.ACK_UNKNOWN_ERR)
-
+        msg = "admin command <%s> returned with code (%d)" % (str(args), result)
+        self.output_log(msg)
         return result
 
 
