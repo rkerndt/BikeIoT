@@ -175,6 +175,18 @@ class TC:
         (request_type,) = struct.unpack_from(TC._payload_type_format, payload, 0)
         return request_type
 
+    @staticmethod
+    def non_block_sleep(sec):
+        """
+        Uses Timer object to wait fo specified seconds. This will not block the main thread.
+        :param sec: 
+        :return: None
+        """
+        rested = threading.Event()
+        nap = threading.Timer(sec, lambda: rested.set())
+        nap.start()
+        rested.wait()
+
     """
     The following static methods are signatures for the various mqtt callback functions.
     """
@@ -1282,7 +1294,7 @@ class Server (TC):
             if tc_cmd.type == TC.ADMIN_REBOOT:
                 result = userdata._run_system_command(tc_cmd, userdata._system_reboot)
                 if result == 0:
-                    sleep(10)
+                    TC.non_block_sleep(10)
                     userdata.stop()
             elif tc_cmd.type == TC.ADMIN_WIFI_ENABLE:
                 userdata._run_system_command(tc_cmd, userdata._enable_adhoc_wifi)
