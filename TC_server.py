@@ -115,6 +115,7 @@ class TC:
 
         self.debug_level = TC._debug_level
         self._healthy = False
+        self.subscriptions = None
 
     def output_msg(self, msg:str, stream):
         """
@@ -241,6 +242,8 @@ class TC:
         :return: None
         """
         userdata._healthy = True
+        if rc == mqtt.CONNACK_ACCEPTED and userdata.subscriptions:
+            userdata.mqttc.subscribe(userdata.subscriptions)
         rc_string = mqtt.connack_string(rc)
         msg = "Connection response: %s" % (rc_string)
         userdata.output_log(msg)
@@ -1082,6 +1085,9 @@ class Server (TC):
         self.phase_to_gpio = dict(map)
         self.phases = frozenset(self.phase_to_gpio.keys())
 
+        # Configurable attributes
+        self.subscriptions = [(self.tc_topic, TC._qos), (TC._will_topic, TC._qos), (self.admin_topic, TC._qos)]
+
         self.mqttc = mqtt.Client(controller_id)
 
         # Separate thread to manage TC relays
@@ -1166,9 +1172,6 @@ class Server (TC):
                 self.output_error(msg)
                 exit(1)
 
-        # subscribe to own controller_id topic and will topic to get messages intended for me
-        self.mqttc.subscribe([(self.tc_topic, TC._qos), (TC._will_topic, TC._qos), (self.admin_topic, TC._qos)])
-
         # enter network loop forever, relying on interrupt handler to stop things
         self._relays.start()
         self.mqttc.loop_forever()
@@ -1244,6 +1247,7 @@ class Server (TC):
         if self.debug_level > 2:
             msg = "Sent ACK to %s for message id %d with result %d" % (topic, ack.mid, ack.rc)
             self.output_log(msg)
+
 
     @staticmethod
     def on_topic(client:mqtt.Client, userdata, mqtt_msg:mqtt.MQTTMessage):
