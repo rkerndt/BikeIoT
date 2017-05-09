@@ -25,6 +25,8 @@ class TC_Logger(TC):
         self.mqttc.username_pw_set(user_id, password="BikeIoT")
         self.mqttc.user_data_set(self)
 
+        self.subscriptions = [(self.tc_topic, TC._qos)]
+
         #set all callbacks since we which to log everything seen from the brocker
         self.mqttc.will_set(TC._will_topic, TC_Identifier(TC.WILL, self.id).encode())
         self.mqttc.on_connnect = TC.on_connect
