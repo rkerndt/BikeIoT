@@ -98,7 +98,7 @@ class TC:
     _will_topic =  _topic_base + 'will'
     _tc_topic_format = _topic_base + '%s'
     _tc_admin_format = _admin_base + '%s'
-    _broker_url = 'mqtt.eug.kerndt.com'  #iot.eclipse.org or test.mosquitto.org
+    _broker_url = 'mqtt.fastraq.bike'  #iot.eclipse.org or test.mosquitto.org
     _broker_port = 1883
     _broker_keepalive = 10
     _bind_address = "100.81.111.18"
