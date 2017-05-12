@@ -464,7 +464,7 @@ class TC_Identifier(TC_Type):
     Structure for TC identifier payload. Includes just the type and sender fields. This class is used for the
     will payload (with type set to TC.Will. All other payload types are derived from this class
     """
-    _struct_format = '!i%ds' % (TC.MAX_ID_BYTES,)
+    _struct_format = '!iq%ds' % (TC.MAX_ID_BYTES,)
     _struct_size = struct.calcsize(_struct_format)
 
     def __init__(self, type:int, id:str):
@@ -474,12 +474,14 @@ class TC_Identifier(TC_Type):
         """
         super().__init__(type)
         self.id = id
+        self.timestamp = int(datetime.utcnow().timestamp())
 
     def encode(self):
         """
         Converts will into a bytes object represent the c structure:
         struct TC_Will {
             int type;
+            long long timestamp;
             char id[TC.MAX_ID_BYTES];
         }  __attribute__((PACKED));
         :return: bytearray
@@ -488,7 +490,7 @@ class TC_Identifier(TC_Type):
         if len(id_bytes) > TC.MAX_ID_BYTES:
             msg = "user id <%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        packed = struct.pack(TC_Identifier._struct_format, self.type, id_bytes)
+        packed = struct.pack(TC_Identifier._struct_format, self.type, self.timestamp, id_bytes)
         return bytearray(packed)
 
     @classmethod
@@ -502,9 +504,10 @@ class TC_Identifier(TC_Type):
         if len(msg.payload) < TC_Identifier._struct_size:
             msg = 'improperly formatted TC Will payload'
             raise TC_Exception(msg)
-        type, id_bytes = struct.unpack_from(TC_Identifier._struct_format, msg.payload, 0)
+        type, timestamp, id_bytes = struct.unpack_from(TC_Identifier._struct_format, msg.payload, 0)
         id = id_bytes.decode('utf-8').rstrip('\0')
         myID = TC_Identifier(type, id)
+        myID.timestamp = timestamp
         myID._encoding = TC.ENCODING_C_STRUC
         myID._src_mid = msg.mid
         return myID
@@ -514,7 +517,7 @@ class TC_Identifier(TC_Type):
         My human readable form
         :return: string
         """
-        return "tc command type %d with ID %s" % (self.type, self.id)
+        return "tc command type %d, timestamp %s with ID %s" % (self.type, datetime.utcfromtimestamp(self.timestamp), self.id)
 
 
 class TC_Request(TC_Identifier):
@@ -522,7 +525,7 @@ class TC_Request(TC_Identifier):
     Structure and methods for manipulating mqtt payloads used in traffic control requests
     """
 
-    _struct_format = '!i%ds%dsi' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
+    _struct_format = '!iq%ds%dsi' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
     _struct_size = struct.calcsize(_struct_format)
 
     def __init__(self, user_id: str, controller_id: str, phase: int):
@@ -543,6 +546,7 @@ class TC_Request(TC_Identifier):
 
         struct TC_Request {
             int type;
+            long long timestamp;
             char user_id[TC.MAX_ID_BYTES];
             char controller_id[TC.MAX_ID_BYTES];
             int phase;
@@ -558,7 +562,7 @@ class TC_Request(TC_Identifier):
         if len(controller_id_bytes) > TC.MAX_ID_BYTES:
             msg = "controller id <%s> exceeds %d utf-8 bytes" % (self.controller_id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        packed = struct.pack(TC_Request._struct_format, self.type, user_id_bytes, controller_id_bytes, self.phase)
+        packed = struct.pack(TC_Request._struct_format, self.type, self.timestamp, user_id_bytes, controller_id_bytes, self.phase)
         return bytearray(packed)
 
     @classmethod
@@ -574,7 +578,7 @@ class TC_Request(TC_Identifier):
             msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(msg.payload))
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
+        type, timestamp, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
 
         if type != TC.PHASE_REQUEST:
             msg = 'payload claimed to be a phase request but received code (%d)' % type
@@ -583,6 +587,7 @@ class TC_Request(TC_Identifier):
         controller_id = controller_id_bytes.decode('utf-8').rstrip('\0')
 
         myRequest = TC_Request(user_id, controller_id, phase)
+        myRequest.timestamp = timestamp
         myRequest._encoding = TC.ENCODING_C_STRUC
         myRequest._src_mid = msg.mid
         return myRequest
@@ -597,7 +602,8 @@ class TC_Request(TC_Identifier):
         # fist stuff object attributes into a dictionary
         json_dict = {}
         json_dict['type'] = self.type
-        json_dict['id'] = self.idim
+        json_dict['timestamp'] = self.timestamp
+        json_dict['id'] = self.id
         json_dict['controller_id'] = self.controller_id
         json_dict['phase'] =self.phase
         json.dump(json_dict, fs)
@@ -616,11 +622,13 @@ class TC_Request(TC_Identifier):
             raise TC_Exception(msg)
         try:
             type = int(json_dict['type'])
+            timestamp = int(json_dict['timestamp'])
             id = json_dict['id']
             controller_id = json_dict['controller_id']
             phase = int(json_dict['phase'])
             new_tc_reqeust = TC_Request(id, controller_id, phase)
             new_tc_reqeust.type = type
+            new_tc_reqeust.timestamp = timestamp
             return new_tc_reqeust
         except:
             msg = "Malformed TC_Request Encoding: %s" % (str(json_dict),)
@@ -631,12 +639,13 @@ class TC_Request(TC_Identifier):
         Generates a human readable string suitable for logging
         :return: str
         """
+        myTime = datetime.utcfromtimestamp(self.timestamp)
         if self.type == TC.PHASE_REQUEST_ON:
-            msg = "User %s requests phase %d on controller %s" % (self.id, self.phase, self.controller_id)
+            msg = "User %s requests phase %d, timestamp %s, on controller %s" % (self.id, self.phase, myTime, self.controller_id)
         elif self.type == TC.PHASE_REQUEST_OFF:
-            msg = "User %s releases phase %d on controller %s" % (self.id, self.phase, self.controller_id)
+            msg = "User %s releases phase %d, timestamp %s, on controller %s" % (self.id, self.phase, myTime, self.controller_id)
         else:
-            msg = "User %s sent request type %d to controller %s" % (self.id, self.phase, self.controller_id)
+            msg = "User %s sent request type %d, timestamp %s, to controller %s" % (self.id, self.phase, myTime, self.controller_id)
         return msg
 
 
@@ -668,7 +677,7 @@ class TC_Request_On(TC_Request):
             msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(msg.payload))
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
+        type, timestamp, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
 
         if type != TC.PHASE_REQUEST_ON:
             msg = 'payload claimed to be a phase request on but received code (%d)' % type
@@ -677,6 +686,7 @@ class TC_Request_On(TC_Request):
         controller_id = controller_id_bytes.decode('utf-8').rstrip('\0')
 
         myRequestOn = TC_Request_On(user_id, controller_id, phase)
+        myRequestOn.timestamp = timestamp
         myRequestOn._encoding = TC.ENCODING_C_STRUC
         myRequestOn._src_mid = msg.mid
         return myRequestOn
@@ -710,7 +720,7 @@ class TC_Request_Off(TC_Request):
             msg = 'improperly formatted TC Request payload: expected %d bytes got %d' % (TC_Request._struct_size, len(msg.payload))
             raise TC_Exception(msg)
 
-        type, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
+        type, timestamp, user_id_bytes, controller_id_bytes, phase = struct.unpack(TC_Request._struct_format, msg.payload)
 
         if type != TC.PHASE_REQUEST_OFF:
             msg = 'payload claimed to be a phase request off but received code (%d)' % type
@@ -719,6 +729,7 @@ class TC_Request_Off(TC_Request):
         controller_id = controller_id_bytes.decode('utf-8').rstrip('\0')
 
         myRequestOff = TC_Request_Off(user_id, controller_id, phase)
+        myRequestOff.timestamp = timestamp
         myRequestOff._encoding = TC.ENCODING_C_STRUC
         myRequestOff._src_mid = msg.mid
         return myRequestOff
@@ -729,7 +740,7 @@ class TC_ACK(TC_Identifier):
     TC_ACK provides acknowledgement that referenced command suceeded
     """
 
-    _struct_format = '!i%dsii' % (TC.MAX_ID_BYTES,)
+    _struct_format = '!iq%dsii' % (TC.MAX_ID_BYTES,)
     _struct_size = struct.calcsize(_struct_format)
 
 
@@ -755,6 +766,7 @@ class TC_ACK(TC_Identifier):
 
         struct TC_ACK {
             int type;
+            long long timestamp;
             char user_id[TC.MAX_ID_BYTES];
             int mid;
             int rc;
@@ -766,7 +778,7 @@ class TC_ACK(TC_Identifier):
         if len(user_id_bytes) > TC.MAX_ID_BYTES:
             msg = "user id <%s> exceeds %d utf-8 bytes" % (self.id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        packed = struct.pack(TC_ACK._struct_format, self.type, user_id_bytes, self.mid, self.rc)
+        packed = struct.pack(TC_ACK._struct_format, self.type, self.timestamp, user_id_bytes, self.mid, self.rc)
         return bytearray(packed)
 
 
@@ -781,7 +793,7 @@ class TC_ACK(TC_Identifier):
             msg = 'improperly formatted TC ACK payload: expected %d bytes got %d' % (TC_ACK._struct_size, len(msg.payload))
             raise TC_Exception(msg)
 
-        type, user_id_bytes, mid, rc = struct.unpack(TC_ACK._struct_format, msg.payload)
+        type, timestamp, user_id_bytes, mid, rc = struct.unpack(TC_ACK._struct_format, msg.payload)
 
         if type != TC.ACK:
             msg = 'payload claimed to be an ACK but received code (%d)' % type
@@ -789,6 +801,7 @@ class TC_ACK(TC_Identifier):
         user_id = user_id_bytes.decode('utf-8').rstrip('\0')
 
         myACK = TC_ACK(user_id, mid, rc)
+        myACK.timestamp = timestamp
         myACK._encoding = TC.ENCODING_C_STRUC
         myACK._src_mid = msg.mid
 
@@ -803,6 +816,7 @@ class TC_ACK(TC_Identifier):
         """
         json_dict = {}
         json_dict['type'] = self.type
+        json_dict['timestamp'] = self.timestamp
         json_dict['id'] = self.id
         json_dict['mid'] = self.mid
         json_dict['rc'] =self.rc
@@ -821,9 +835,12 @@ class TC_ACK(TC_Identifier):
             raise TC_Exception(msg)
         try:
             id = json_dict['id']
+            timestamp = json_dict['timestamp']
             mid = int(json_dict['mid'])
             rc = int(json_dict['rc'])
-            return TC_ACK(id, mid, rc)
+            myACK = TC_ACK(id, mid, rc)
+            myACK.timestamp = timestamp
+            return myACK
         except:
             msg = "Malformed TC_Request Encoding: %s" % (str(json_dict),)
             raise TC_Exception(msg)
@@ -833,7 +850,8 @@ class TC_ACK(TC_Identifier):
         Human readable string
         :return: string
         """
-        msg = "Acknowledgement to %s for message id %d with result %s" % (self.id, self.mid, TC.RESULT_CODES[self.rc])
+        msg = "Acknowledgement to %s for message id %d with result %s and timestamp %s" % \
+              (self.id, self.mid, TC.RESULT_CODES[self.rc], datetime.utcfromtimestamp(self.timestamp))
         return msg
 
 
@@ -842,7 +860,7 @@ class TC_Admin(TC_Identifier):
     Base class for administration commands where want to require an action but do not need to provide input
     """
 
-    _struct_format = '!i%ds%ds' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
+    _struct_format = '!iq%ds%ds' % (TC.MAX_ID_BYTES, TC.MAX_ID_BYTES)
     _struct_size = struct.calcsize(_struct_format)
 
     def __init__(self, tc_cmd:int, user_id:str, controller_id:str):
@@ -873,7 +891,7 @@ class TC_Admin(TC_Identifier):
         if len(controller_id_bytes) > TC.MAX_ID_BYTES:
             msg = "controller id <%s> exceeds %d utf-8 bytes" % (self.controller_id, TC.MAX_ID_BYTES)
             raise TC_Exception(msg)
-        packed = struct.pack(TC_Admin._struct_format, self.type, id_bytes, controller_id_bytes)
+        packed = struct.pack(TC_Admin._struct_format, self.type, self.timestamp, id_bytes, controller_id_bytes)
         return bytearray(packed)
 
     @classmethod
@@ -886,10 +904,11 @@ class TC_Admin(TC_Identifier):
         if len(msg.payload) < TC_Admin._struct_size:
             msg = 'improperly formatted TC Admin payload'
             raise TC_Exception(msg)
-        type, id_bytes, controller_id_bytes = struct.unpack_from(TC_Admin._struct_format, msg.payload, 0)
+        type, timestamp, id_bytes, controller_id_bytes = struct.unpack_from(TC_Admin._struct_format, msg.payload, 0)
         id = id_bytes.decode('utf-8').rstrip('\0')
         controller_id = controller_id_bytes.decode('utf-8').rstrip('\0')
         admin_cmd = TC_Admin(type, id, controller_id)
+        admin_cmd.timestamp = timestamp
         admin_cmd._encoding = TC.ENCODING_C_STRUC
         admin_cmd._src_mid = msg.mid
 
@@ -900,7 +919,8 @@ class TC_Admin(TC_Identifier):
         Return a human readable form
         :return: str
         """
-        msg = "User %s executing command %d on %s" % (self.id, self.type, self.controller_id)
+        msg = "User %s executing command %d on %s at %s" % \
+              (self.id, self.type, self.controller_id, datetime.utcfromtimestamp(self.timestamp))
         return msg
 
 
