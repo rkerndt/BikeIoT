@@ -392,20 +392,23 @@ class TC:
         :param payload: JSON dictionary encoding
         :return: TC_type derived class
         """
-        payload_string = mqtt_msg.payload.decode("utf-8")
-        payload_stream = StringIO(payload_string)
-        payload_dict = json.load(payload_stream)
-        if "type" in payload_dict:
-            type = payload_dict["type"]
-            if type in [TC.PHASE_REQUEST, TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
-                request = TC_Request.json_load(payload_dict)
-            elif type == TC.ACK:
-                request = TC_ACK.json_load(payload_dict)
-            else:
-                raise TC_Exception("Unrecognized message type (%d)" % (type,))
-            request._encoding = TC.ENCODING_JSON
-            request._src_mid = mqtt_msg.mid
-            return request
+        try:
+            payload_string = mqtt_msg.payload.decode("utf-8")
+            payload_stream = StringIO(payload_string)
+            payload_dict = json.load(payload_stream)
+            if "type" in payload_dict:
+                type = payload_dict["type"]
+                if type in [TC.PHASE_REQUEST, TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
+                    request = TC_Request.json_load(payload_dict)
+                elif type == TC.ACK:
+                    request = TC_ACK.json_load(payload_dict)
+                else:
+                    raise TC_Exception("Unrecognized message type (%d)" % (type,))
+                request._encoding = TC.ENCODING_JSON
+                request._src_mid = mqtt_msg.mid
+                return request
+        except (UnicodeDecodeError, json.JSONDecodeError) as err:
+            raise TC_Exception("JSON decoding error: %s" % str(err))
 
 
 class TC_Type:
