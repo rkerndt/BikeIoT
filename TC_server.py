@@ -64,11 +64,13 @@ class TC:
     ACK_OK = 0x00
     ACK_INVALID_PHASE = 0x01
     ACK_INVALID_CMD = 0x02
+    ACK_DUPLICATE_MID = 0x03
     ACK_UNKNOWN_ERR = 0xFF
     RESULT_CODES = { ACK_OK: 'OK',
                      ACK_INVALID_PHASE: 'Invalid Phase Number',
                      ACK_INVALID_CMD: 'Invalid command type',
-                     ACK_UNKNOWN_ERR: 'Failed, unknown error'}
+                     ACK_UNKNOWN_ERR: 'Failed, unknown error',
+                     ACK_DUPLICATE_MID: 'Duplicate message id'}
 
 
     # Constants
@@ -86,6 +88,7 @@ class TC:
     TC_REQUEST_LENGTH = 4  # for json encoded objects
     TC_ACK_LENGTH = 4
     COMMAND_TIMEOUT = 10   # number of seconds to wait for tc command to complete before giving up
+    DEFAULT_MSG_LIFE = 10  #seconds
 
     # encodings
     ENCODING_C_STRUC = 0x100
@@ -1085,6 +1088,56 @@ class TC_Relay(threading.Thread):
             grovepi.digitalWrite(pin, value)
         self._lock.release()
 
+class Message_tracker:
+    """
+    Maintains a dictionary of message ids associated with timestamp and method to perform an atomic add/test of
+    a new message id
+    """
+
+    TIMER_INTERVAL = 1.0
+
+    def __init__(self):
+        super().__init__()
+        self.lifetime = TC.DEFAULT_MSG_LIFE
+        self._message_ids = dict()
+        self._lock = threading.Lock()
+        self._event = threading.Event()
+        self._timer = threading.Timer(Message_tracker.TIMER_INTERVAL, self._purge)
+        self._timer.start()
+
+    def _purge(self):
+        """
+        Removes expired message ids
+        :return: None
+        """
+        self._lock.acquire()
+        if len(self._message_ids) > 0:
+            expired = datetime.utcnow().timestamp() - self.lifetime
+            for mid, timestamp in list(self._message_ids.items()):
+                if timestamp < expired:
+                    del self._message_ids[mid]
+        self._lock.release()
+        self._timer = threading.Timer(Message_tracker.TIMER_INTERVAL, self._purge)
+        self._timer.start()
+
+    def is_duplicate(self, tc_cmd:TC_Identifier):
+        """
+        Atomically checks if message id is in dictionary returning True if not present where it will add it, if
+        message is in dictionary returns False. Where the attribute _src_id is None no action is taken and the
+        False is returned.
+        :param msg: 
+        :return: True or False
+        """
+        duplicate = False
+        if tc_cmd._src_mid:
+            self._lock.acquire()
+            if tc_cmd._src_mid in self._message_ids:
+                duplicate = True
+            else:
+                self._message_ids[tc_cmd._src_mid] = tc_cmd.timestamp
+            self._lock.release()
+        return duplicate
+
 class Server (TC):
     """
     Traffic controller server for receiving phase requests from mqtt clients.
@@ -1145,6 +1198,10 @@ class Server (TC):
         self._enable_adhoc_wifi = ["/sbin/ifup", "wlan0"]
         self._disable_adhoc_wifi = ["/sbin/ifdown", "wlan0"]
         self._system_reboot = ["/sbin/shutdown", "--reboot", "+1"]
+
+        # track message ids so we can check for duplicates
+        self._seen_mids = Message_tracker()
+
 
     def run(self):
         """
@@ -1285,7 +1342,11 @@ class Server (TC):
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
             tc_cmd = TC.decode(mqtt_msg)
-            if tc_cmd.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
+            if userdata._seen_messages.is_duplicate(tc_cmd):
+                userdata.send_ack(tc_cmd, TC.ACK_DUPLICATE_MID)
+                msg = "Received duplicate message id %d from %s" % (tc_cmd._src_mid, tc_cmd.id)
+                userdata.output_error(msg)
+            elif tc_cmd.type in [TC.PHASE_REQUEST_ON, TC.PHASE_REQUEST_OFF]:
                 userdata.request_phase(tc_cmd)
             elif tc_cmd.type == TC.ID:
                 userdata.send_ack(tc_cmd, TC.ACK_OK)
@@ -1311,15 +1372,16 @@ class Server (TC):
             tc_cmd = TC.decode(msg)
 
             # check that command is intended for this server
-            if tc_cmd.controller_id != userdata.id:
-                for n,char in enumerate(tc_cmd.controller_id):
-                    if char != userdata.id[n]:
-                        print("<%s> != <%s>" % (char, userdata.id[n]))
+            if userdata._seen_messages.is_duplicate(tc_cmd):
+                userdata.send_ack(tc_cmd, TC.ACK_DUPLICATE_MID)
+                msg = "Received duplicate message id %d from %s" % (tc_cmd._src_mid, tc_cmd.id)
+                userdata.output_error(msg)
+            elif tc_cmd.controller_id != userdata.id:
                 rc = TC.ACK_INVALID_CMD
                 msg = '%s received command type %d intended for controller %s' % (userdata.id, tc_cmd.type, tc_cmd.controller_id)
                 raise TC_Exception(msg)
 
-            if tc_cmd.type == TC.ADMIN_REBOOT:
+            elif tc_cmd.type == TC.ADMIN_REBOOT:
                 userdata._run_system_command(tc_cmd, userdata._system_reboot)
             elif tc_cmd.type == TC.ADMIN_WIFI_ENABLE:
                 userdata._run_system_command(tc_cmd, userdata._enable_adhoc_wifi)
