@@ -1382,7 +1382,7 @@ class Server (TC):
             tc_cmd = TC.decode(msg)
 
             # check that command is intended for this server
-            if userdata._seen_messages.is_duplicate(tc_cmd):
+            if userdata._seen_mids.is_duplicate(tc_cmd):
                 userdata.send_ack(tc_cmd, TC.ACK_DUPLICATE_MID)
                 msg = "Received duplicate message id %d from %s" % (tc_cmd._src_mid, tc_cmd.id)
                 userdata.output_error(msg)
