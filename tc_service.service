@@ -11,7 +11,7 @@
     KillMode=process
     WatchdogSec=60
     Restart=on_watchdog
-    ExecStart=/usr/bin/python3 /home/pi/TC_server.py beacon_1.cs.uoregon.edu
+    ExecStart=/usr/bin/python3 /home/pi/TC_server.py beacon_1.fastraq.bike
 
 [Install]
     WantedBy=multi-user.target

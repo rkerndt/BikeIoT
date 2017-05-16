@@ -9,7 +9,7 @@
 [Service]
     Type=idle
     KillMode=process
-    ExecStart=/usr/bin/python3 /home/pi/Logger.py logger
+    ExecStart=/usr/bin/python3 /home/pi/Logger.py logger.fastraq.bike
     StandardOutput=journal
     StandardError=journal
 
