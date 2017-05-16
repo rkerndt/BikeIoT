@@ -36,6 +36,7 @@ while True:
             continue
         if commands[0] == 'controller' and len(commands) == 2:
             controllerID = commands[1]
+            myUser._wait_for_ack = False
         elif commands[0] == 'on' and len(commands) == 2 and commands[1].isdigit():
             myUser.send_phase_request(controllerID, int(commands[1]))
         elif commands[0] == 'off' and len(commands) == 2 and commands[1].isdigit():

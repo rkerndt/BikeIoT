@@ -1138,6 +1138,14 @@ class Message_tracker:
             self._lock.release()
         return duplicate
 
+    def stop(self):
+        """
+        Cancel timer, if any
+        :return: None
+        """
+        if self._timer:
+            self._timer.cancel()
+
 class Server (TC):
     """
     Traffic controller server for receiving phase requests from mqtt clients.
@@ -1278,6 +1286,8 @@ class Server (TC):
         if self._relays.isAlive():
             self._relays.stop()
             self._relays.join()
+        if self._seen_mids:
+            self._seen_mids.stop()
 
     def request_phase(self, request:TC_Request):
         """
@@ -1342,7 +1352,7 @@ class Server (TC):
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
             tc_cmd = TC.decode(mqtt_msg)
-            if userdata._seen_messages.is_duplicate(tc_cmd):
+            if userdata._seen_mids.is_duplicate(tc_cmd):
                 userdata.send_ack(tc_cmd, TC.ACK_DUPLICATE_MID)
                 msg = "Received duplicate message id %d from %s" % (tc_cmd._src_mid, tc_cmd.id)
                 userdata.output_error(msg)
@@ -1495,6 +1505,9 @@ class User(TC):
         self._ack_event = threading.Event()
         self._wait_for_ack = False
 
+        # add subscriptions
+        self.subscriptions = [(self._will_topic, self._qos), (self.my_topic, self._qos)]
+
     def start(self):
         """
         Connects to broker and enters loop_forever. Use stop() call to terminate connection to broker and
@@ -1502,11 +1515,6 @@ class User(TC):
         :return: None
         """
         self.mqttc.connect(self._broker_url, self._broker_port, self._broker_keepalive)
-
-        # subscribe to will topic to get messages intended for me
-        self.mqttc.subscribe(self._will_topic, self._qos)
-        self.mqttc.subscribe(self.my_topic, self._qos)
-
 
         # start network loop
         msg = "starting TC User with id %s" % (self.id,)

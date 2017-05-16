@@ -10,7 +10,7 @@
     Type=notify
     KillMode=process
     WatchdogSec=60
-    Restart=on_watchdog
+    Restart=always
     ExecStart=/usr/bin/python3 /home/pi/TC_server.py beacon_1.fastraq.bike
 
 [Install]
