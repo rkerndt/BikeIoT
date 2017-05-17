@@ -111,19 +111,8 @@ class TC_Logger(TC):
         request = None
 
         try:
-            request_type = TC.get_type(msg.payload)
-            if request_type == TC.PHASE_REQUEST_ON:
-                request = TC_Request_On.decode(msg)
-            elif request_type == TC.PHASE_REQUEST_OFF:
-                request = TC_Request_Off.decode(msg)
-            elif request_type == TC.ACK:
-                request = TC_ACK.decode(msg)
-            else:
-                # try decoding as a json encoded string
-                request = TC.decode_json(msg)
+            request = TC.decode(msg)
         except TC_Exception as err:
-            userdata.output_error(err.msg)
-        except JSONDecodeError as err:
             userdata.output_error(err.msg)
         if request:
             log_msg = "[%s] %s" % (msg.topic, request.__str__())
