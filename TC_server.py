@@ -637,7 +637,7 @@ class TC_Request(TC_Identifier):
             new_tc_reqeust.timestamp = timestamp
             return new_tc_reqeust
         except:
-            msg = "Malformed TC_Request Encoding: %s" % (str(json_dict),)
+            msg = "Malformed TC_Request Encoding: %s : %s" % (str(json_dict),sys.exc_info()[0])
             raise TC_Exception(msg)
 
     def __str__(self):
