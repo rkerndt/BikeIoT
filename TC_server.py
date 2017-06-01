@@ -623,8 +623,8 @@ class TC_Request(TC_Identifier):
         """
 
         # validate dictionary and then create TC_Request Object
-        if len(json_dict) != TC.TC_ACK_LENGTH:
-            msg = "JSON encoding contains %d elements when expecting %d" % (len(json_dict), TC.TC_ACK_LENGTH)
+        if len(json_dict) != TC.TC_REQUEST_LENGTH:
+            msg = "JSON encoding contains %d elements when expecting %d" % (len(json_dict), TC.TC_REQUEST_LENGTH)
             raise TC_Exception(msg)
         try:
             type = int(json_dict['type'])
@@ -637,7 +637,7 @@ class TC_Request(TC_Identifier):
             new_tc_reqeust.timestamp = timestamp
             return new_tc_reqeust
         except:
-            msg = "Malformed TC_Request Encoding: %s" % (str(json_dict),)
+            msg = "Malformed TC_Request Encoding: %s : %s" % (str(json_dict),sys.exc_info()[0])
             raise TC_Exception(msg)
 
     def __str__(self):
