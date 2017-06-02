@@ -269,8 +269,8 @@ class TC:
     def on_message(client, userdata, msg:mqtt.MQTTMessage):
         """
         Called when a message has been received on a topic that the client subscribes to. This callback will be
-        called for every message received. Use message_callback_add() to define multiple callbacks that will be
-        called for specific topic filters.
+        called for every message received on a topic that does not have its own callback. Use message_callback_add()
+        to define multiple callbacks that will be called for specific topic filters.
         :param client: paho.mqtt.client
         :param userdata: TC Server or Client handling callback
         :param mqtt_msg: MQTTMessage
@@ -1351,6 +1351,8 @@ class Server (TC):
         :return: None
         """
 
+        userdata._healthy = True
+
         # only handling PHASE_REQUEST for now, if no match then ignore
         try:
             tc_cmd = TC.decode(mqtt_msg)
@@ -1601,6 +1603,8 @@ class User(TC):
         :param mqtt_msg:
         :return: None
         """
+
+        userdata._healthy = True
 
         type = TC.get_type(mqtt_msg.payload)
         if type == TC.ACK:

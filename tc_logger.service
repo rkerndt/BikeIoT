@@ -7,7 +7,9 @@
     After=network.target
 
 [Service]
-    Type=idle
+    Type=notify
+    WatchdogSec=60
+    Restart=always
     KillMode=process
     ExecStart=/usr/bin/python3 /home/pi/Logger.py logger.fastraq.bike
     StandardOutput=journal

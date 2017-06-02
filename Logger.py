@@ -3,13 +3,15 @@ Rickie Kerndt <rkerndt@cs.uoregon.edu>
 Subscribes to all tc\ messages and output message payload to file.
 """
 
-from TC_server import TC, TC_Exception, TC_Identifier, TC_Request_Off, TC_Request_On, TC_ACK
+from TC_server import TC, TC_Exception, TC_Identifier
 import paho.mqtt.client as mqtt
 import socket
 from time import sleep
 import signal
 import sys
-from json import JSONDecodeError
+from ctypes import *
+import threading
+import os
 
 class TC_Logger(TC):
 
@@ -37,12 +39,34 @@ class TC_Logger(TC):
         self.mqttc.on_unsubscribe = TC.on_unsubscribe
         self.mqttc.message_callback_add(self.tc_topic, TC_Logger.on_topic)
 
+        # watchdog timer, set watchdog_pid iff running with systemd type=notify
+        self._watchdog_timer = None
+        self.watchdog_pid = None
+        self.watchdog_sec = None
+
+        # load needed dynamic libraries
+        self._libsystemd = CDLL("libsystemd.so")
+
 
     def run(self):
         """
 
         :return: None
         """
+
+        #tell systemd we are ready
+        result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"READY=1".encode('ascii'))
+        if result <= 0:
+            msg = "Error %d sending sd_pid_notify READY" % (result,)
+            self.output_log(msg)
+
+        # initialize watchdog
+        if self.watchdog_pid and self.watchdog_sec:
+            if self.debug_level > 2:
+                msg = "Initializing watchdog timer on pid %d and interval %f seconds" % (self.watchdog_pid,
+                        self.watchdog_sec/TC.WATCHDOG_INTERVAL)
+                self.output_log(msg)
+            self.watchdog()
 
         connected = False
         connection_retry_delay = TC.INITIAL_CONNECTION_RETRY_DELAY
@@ -68,7 +92,7 @@ class TC_Logger(TC):
                 self.output_error(msg)
                 exit(error_int)
             except:
-                msg = "aborted with unkown error"
+                msg = "aborted with unkown error: %s" % (sys.exc_info()[0],)
                 self.output_error(msg)
                 exit(1)
 
@@ -86,6 +110,34 @@ class TC_Logger(TC):
         msg = "stopping TC Logger %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.disconnect()
+
+
+    def watchdog(self):
+        """
+        Method sends 'heartbeat' to sd_notfiy(3). When run from systemd will cause system to restart the service.
+        This should be called with a period <= WatchdogSec/3. (see systemd.service(8))
+
+        Add features to the method to check on thread status and take corrective actions as needed.
+        :return: None
+        """
+
+        if self.debug_level > 3:
+            msg = "Running watchdog for pid %d, timeout in %d seconds" % (self.watchdog_pid, self.watchdog_sec)
+            self.output_log(msg)
+
+        result = 0
+
+        # load the library at run time using cdll
+        if self._healthy:
+            result = self._libsystemd.sd_pid_notify(self.watchdog_pid,0,"WATCHDOG=1".encode('ascii'))
+
+        if result <= 0:
+            msg = "Error (%d) in sd_pid_notify" % (result,)
+            self.output_log(msg)
+        self._watchdog_timer = threading.Timer(self.watchdog_sec/TC.WATCHDOG_INTERVAL, self.watchdog)
+        self._watchdog_timer.start()
+        self._healthy = False
+
 
     def signal_handler(self, signum, frame):
         """
@@ -135,6 +187,21 @@ def main(argv):
         sys.exit(0)
 
     myLogger = TC_Logger(argv[1])
+
+    if myLogger._debug_level > 2:
+        myPID = os.getpid()
+        print("Process ID = %d" % myPID)
+        myLogger.watchdog_pid = myPID
+        myLogger.watchdog_sec = 10
+
+    if ("WATCHDOG_PID" in os.environ) and os.environ["WATCHDOG_PID"].isdigit():
+        myLogger.watchdog_pid = int(os.environ["WATCHDOG_PID"])
+        print("watchdog pid = %s" % (myLogger.watchdog_pid,))
+
+    if ("WATCHDOG_USEC" in os.environ) and os.environ["WATCHDOG_USEC"].isdigit():
+        myLogger.watchdog_sec = int(os.environ["WATCHDOG_USEC"]) // 1000000
+        print("watchdog sec = %s" % (myLogger.watchdog_sec,))
+
 
     signal.signal(signal.SIGTERM, myLogger.signal_handler)
     signal.signal(signal.SIGINT, myLogger.signal_handler)
