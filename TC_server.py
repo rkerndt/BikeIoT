@@ -410,8 +410,10 @@ class TC:
                 request._encoding = TC.ENCODING_JSON
                 request._src_mid = mqtt_msg.mid
                 return request
-        except (UnicodeDecodeError, json.JSONDecodeError) as err:
+        except UnicodeDecodeError as err:
             raise TC_Exception("JSON decoding error: %s" % str(err))
+        except:
+            raise TC_Exception("Unkown exception %s" % (sys.exc_info()[0],))
 
 
 class TC_Type:
