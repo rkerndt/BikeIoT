@@ -11,7 +11,7 @@
     WatchdogSec=60
     Restart=always
     KillMode=process
-    ExecStart=/usr/bin/python3 /home/pi/Logger.py logger.fastraq.bike
+    ExecStart=/usr/bin/python3 /home/pi/Logger.py logger
     StandardOutput=journal
     StandardError=journal
 

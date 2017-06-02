@@ -34,6 +34,7 @@ class TC_Logger(TC):
         self.mqttc.on_connnect = TC.on_connect
         self.mqttc.on_disconnect = TC.on_disconnect
         self.mqttc.on_message = TC.on_message
+        self.mqttc.on_log = TC.on_log
         self.mqttc.on_publish = TC.on_publish
         self.mqttc.on_subscribe = TC.on_subscribe
         self.mqttc.on_unsubscribe = TC.on_unsubscribe
@@ -110,6 +111,8 @@ class TC_Logger(TC):
         msg = "stopping TC Logger %s" % (self.id,)
         self.output_log(msg)
         self.mqttc.disconnect()
+        if self._watchdog_timer:
+            self._watchdog_timer.cancel()
 
 
     def watchdog(self):
@@ -125,7 +128,7 @@ class TC_Logger(TC):
             msg = "Running watchdog for pid %d, timeout in %d seconds" % (self.watchdog_pid, self.watchdog_sec)
             self.output_log(msg)
 
-        result = 0
+        result = 1
 
         # load the library at run time using cdll
         if self._healthy:
