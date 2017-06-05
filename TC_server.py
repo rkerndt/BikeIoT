@@ -85,7 +85,7 @@ class TC:
     PHASE_OFF = 0x00
     WATCHDOG_INTERVAL = 4
     MAX_ID_BYTES = 64      # maximum identifer length after utf-8 conversion
-    TC_REQUEST_LENGTH = 4  # for json encoded objects
+    TC_REQUEST_LENGTH = 5  # for json encoded objects
     TC_ACK_LENGTH = 4
     COMMAND_TIMEOUT = 10   # number of seconds to wait for tc command to complete before giving up
     DEFAULT_MSG_LIFE = 10  #seconds
