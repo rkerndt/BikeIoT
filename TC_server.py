@@ -412,6 +412,8 @@ class TC:
                 return request
         except UnicodeDecodeError as err:
             raise TC_Exception("JSON decoding error: %s" % str(err))
+        except TC_Exception as err:
+            raise err
         except:
             raise TC_Exception("Unkown exception %s" % (sys.exc_info()[0],))
 
