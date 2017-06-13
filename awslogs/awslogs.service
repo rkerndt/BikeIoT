@@ -1,0 +1,13 @@
+[Unit]
+Description=AWS CloudWatch Logs Agent
+
+[Service]
+Type=simple
+Restart=always
+KillMode=process
+PIDFile=/var/awslogs/state/awslogs.pid
+ExecStart=/var/awslogs/bin/awslogs-agent-launcher.sh --start --background  --pidfile $PIDFILE
+
+[Install]
+WantedBy=multi-user.target
+
