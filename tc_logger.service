@@ -11,6 +11,11 @@
     WatchdogSec=60
     Restart=always
     KillMode=process
+    SyslogIdentifier=tc_logger
+    SyslogFacility=daemon
+    SyslogLevel=info
+    StandardOutput=syslog
+    StandardError=syslog
     ExecStart=/usr/bin/python3 /home/pi/Logger.py logger
     StandardOutput=journal
     StandardError=journal

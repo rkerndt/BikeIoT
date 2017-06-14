@@ -11,6 +11,7 @@
     KillMode=process
     WatchdogSec=60
     Restart=always
+    SyslogIdentifier=tc_service
     ExecStart=/usr/bin/python3 /home/pi/TC_server.py beacon_1.fastraq.bike
 
 [Install]
